@@ -48,9 +48,11 @@ int main(){
     printf("[DYREKTOR] Ewakuacja logiczna.\n");
     shm->koniec_pracy = 2;
 
-    while (wait(NULL) > 0);
+    //Czekam na dziecki
+    while (wait(NULL) > 0); 
 
     //Funkcja do czyszczena
+    cleanup()
 
     return 0;
 }
@@ -69,7 +71,7 @@ void init_ipc() {
     semctl(semid, SEM_BUDYNEK, SETVAL, 0);                      //Wpuszczanie do budynku
     semctl(semid, SEM_PETENCI, SETVAL, MAX_PROCESOW_PETENTOW);  //Ogranicznik petentów
 
-
+    //Utworzenie kolejek komunikatów
     msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0666 | IPC_CREAT);
     msg_urzad_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0666 | IPC_CREAT);
 
@@ -87,6 +89,27 @@ void init_ipc() {
     shm->liczba_petentow_w_budynku = 0;
     shm->kolejka_do_biletow = 0;
     shm->koniec_pracy = 0;
+}
+
+
+//Funkcja czyszcząca
+void cleanup() {
+    //Odłączenie pamięci
+    if (shm != NULL)
+        shmdt(shm);
+
+    shmctl(shmid, IPC_RMID, NULL);              //Usunięcie segmentu pamięci współ.
+    semctl(semid, 0, IPC_RMID);                 //Usunięcie semaforów
+    msgctl(msg_bilet_id, IPC_RMID, NULL);
+    //Usuwanie kolejek komunikatów
+    msgctl(msg_urzad_id, IPC_RMID, NULL);
+
+    // zabij generator jeśli jeszcze działa
+    if (generator_pid > 0)
+        kill(generator_pid, SIGKILL);
+
+    // czekamy na wszystkie dzieciaczki
+    while (wait(NULL) > 0);
 }
 
 
