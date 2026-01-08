@@ -20,7 +20,7 @@
 #define CZAS_DO_OTWARCIA 5 //Tp
 #define CZAS_PRACY 20 //Tk-Tp
 #define CZAS_PO_ZAMKNIECIU 120 //Domślnie 2 minuty wedle założeń projektu
-#define MAX_PROCESOW_PETENTOW 300 //Będzie przydatne do ograniczenia petentów w generatorze
+#define MAX_PROCESOW_PETENTOW 1024 //Będzie przydatne do ograniczenia petentów w generatorze
 
 //Limity wydziałow:
 #define LIMIT_SA 15
