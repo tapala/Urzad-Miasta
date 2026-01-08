@@ -20,6 +20,7 @@
 #define CZAS_DO_OTWARCIA 5 //Tp
 #define CZAS_PRACY 20 //Tk-Tp
 #define CZAS_PO_ZAMKNIECIU 120 //Domślnie 2 minuty wedle założeń projektu
+#define MAX_PROCESOW_PETENTOW 300 //Będzie przydatne do ograniczenia petentów w generatorze
 
 //Limity wydziałow:
 #define LIMIT_SA 15
@@ -46,6 +47,7 @@
 //Identyfikatory semaforów
 #define SEM_MUTEX 0 // Chroni pamięć dzieloną
 #define SEM_BUDYNEK 1 //Semafor na 'wpuszczanie' petentów do budynku
+#define SEM_PETENCI 2 //Semafor ograniczający istniejących procesów petentów
 
 //Pamięć współdzielona:
 typedef struct { 
@@ -69,7 +71,7 @@ typedef struct {
     int wiek_opiekuna; // >25 jeśli petent <18, wedle tych przeklętych wymagań
 } Komunikat;
 
-// Deklaracje funkcji pomocniczych 
+// Deklaracje funkcji pomocniczych  
 void log_to_file(const char *msg); 
 void sem_p(int semid, int sem_num); 
 void sem_v(int semid, int sem_num); 
