@@ -8,51 +8,60 @@ pid_t generator_pid;
 
 int main(){
 
+    //srand(time(NULL));
     init_ipc();
 
     printf("[DYREKTOR] System startuje. Czekamy na Tp - drzwi zamknięte.");
 
     //Urzędnicy:
     if (!fork()) { 
-        //SA
+        start_urzednik(DEPT_SA, LIMIT_SA);
+        perror("execl SA");
         exit(0); 
     }
 
     if (!fork()) { 
-        //SA
+        start_urzednik(DEPT_SA, LIMIT_SA);
+        perror("execl SA");
         exit(0); 
     }
 
     if (!fork()) { 
-        //SC
+        start_urzednik(DEPT_SC, LIMIT_SC);
+        perror("execl SC");
         exit(0); 
     }
     
     if (!fork()) { 
-        //KM
+        start_urzednik(DEPT_KM, LIMIT_KM);
+        perror("execl KM");
         exit(0); 
     }
 
     if (!fork()) { 
-        //ML
+        start_urzednik(DEPT_ML, LIMIT_ML);
+        perror("execl ML");
         exit(0); 
     }
 
     if (!fork()) { 
-        //PD
+        start_urzednik(DEPT_PD, LIMIT_PD);
+        perror("execl PD");
         exit(0); 
     }
 
     if (!fork()) { 
-        //KASA 
+        start_urzednik(DEPT_KASA, LIMIT_KASA);
+        perror("execl kasa");
         exit(0); 
     }
 
 
     //Biletomat:
     if (!fork()) {
-        //Biletomat
-        exit(0);
+        execl("./rejestracja", "rejestracja", NULL);
+        perror("execl rejestracja");
+        exit(1);
     }
 
 
@@ -67,35 +76,35 @@ int main(){
             pid_t child = fork();                       //Forkujemy nasz generator
             if (child == 0) {                           //Jeśli jest dzieciakiem to przerabiamy go na petenta
                 execl("./petent", "petent", NULL);
-                // jeśli tu jesteśmy, exec jebnął
+                //Jeśli tu jesteśmy, exec jebnął
                 perror("execl petent");
                 exit(1);
             }
 
-            // tempo generowania petentów
-            usleep((rand() % 400 + 100) * 10);
+            //Gdyby ktoś chciał to jest lekki opóźniacz do generatora petentów
+            //usleep((rand() % 400 + 100) * 10);
         }
 
         exit(0);
     }
 
 
-    // ----------- HARMONOGRAM -------------
+    //----------- HARMONOGRAM -------------
 
     sleep(CZAS_DO_OTWARCIA);
 
     printf("[DYREKTOR] Tp — otwieramy drzwi.");
 
-    // wpuszczamy N osób na semaforze budynku
+    //Wpuszczamy N osób na semaforze budynku
     sem_op(semid, SEM_BUDYNEK, MAX_PETENTOW_W_BUDYNKU);
 
-    // praca do Tk
+    //Praca do Tk
     sleep(CZAS_PRACY);
 
     printf("[DYREKTOR] Tk — zamykamy, nowi nie wchodzą.\n");
 
     sem_p(semid, SEM_MUTEX);
-    shm->koniec_pracy = 1;   // zamknięcie, ale bez ewakuacji
+    shm->koniec_pracy = 1;   //Zamknięcie, ale bez ewakuacji
     sem_v(semid, SEM_MUTEX);
 
     printf("[DYREKTOR] Frustracja po podanym czasie");
@@ -113,6 +122,8 @@ int main(){
     return 0;
 }
 
+
+//Funkcja tworząca cały syf IPC
 void init_ipc() {
     FILE *f = fopen("raport.txt", "w");
     if (f) { fprintf(f, "--- START SYMULACJI ---\n"); fclose(f); }
@@ -145,6 +156,17 @@ void init_ipc() {
     shm->liczba_petentow_w_budynku = 0;
     shm->kolejka_do_biletow = 0;
     shm->koniec_pracy = 0;
+}
+
+//Funkcja do forkowania urzędników
+void start_urzednik(const char *dept, int limit) {
+    if (!fork()) {
+        char lim[10];
+        sprintf(lim, "%d", limit);
+        execl("./urzednik", "urzednik", dept, lim, NULL);
+        perror("execl urzednik");
+        exit(1);
+    }
 }
 
 
