@@ -28,6 +28,7 @@
 #define LIMIT_KM 8
 #define LIMIT_ML 8
 #define LIMIT_PD 8
+#define LIMIT_KASA 99999999
 
 //Identyfikatory wydziałow i kasy - przyda się do obsługi p[etenta]
 #define DEPT_SA 1

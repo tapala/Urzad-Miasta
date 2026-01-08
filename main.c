@@ -13,11 +13,47 @@ int main(){
     printf("[DYREKTOR] System startuje. Czekamy na Tp - drzwi zamknięte.");
 
     //Urzędnicy:
-    //Dodać potem
+    if (!fork()) { 
+        //SA
+        exit(0); 
+    }
+
+    if (!fork()) { 
+        //SA
+        exit(0); 
+    }
+
+    if (!fork()) { 
+        //SC
+        exit(0); 
+    }
+    
+    if (!fork()) { 
+        //KM
+        exit(0); 
+    }
+
+    if (!fork()) { 
+        //ML
+        exit(0); 
+    }
+
+    if (!fork()) { 
+        //PD
+        exit(0); 
+    }
+
+    if (!fork()) { 
+        //KASA 
+        exit(0); 
+    }
 
 
     //Biletomat:
-    //Dodać potem
+    if (!fork()) {
+        //Biletomat
+        exit(0);
+    }
 
 
     //Generator petentów:
@@ -83,7 +119,7 @@ void init_ipc() {
     shm->limity_przyjec[DEPT_KM] = LIMIT_KM;
     shm->limity_przyjec[DEPT_ML] = LIMIT_ML;
     shm->limity_przyjec[DEPT_PD] = LIMIT_PD;
-    shm->limity_przyjec[DEPT_KASA] = 99999999; //Dodane w celu testowania - jak się będzie psuć to do wywalenia
+    shm->limity_przyjec[DEPT_KASA] = LIMIT_KASA; //Dodane w celu testowania - jak się będzie psuć to do wywalenia
 
     //Zerujemy wartości
     shm->liczba_petentow_w_budynku = 0;
