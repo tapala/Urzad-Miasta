@@ -5,6 +5,56 @@ int shmid, semid, msg_bilet_id, msg_urzad_id;
 SharedData *shm;
 pid_t generator_pid;
 
+
+int main(){
+
+    init_ipc();
+
+    printf("[DYREKTOR] System startuje. Czekamy na Tp - drzwi zamknięte.");
+
+    //Urzędnicy:
+    //Dodać potem
+
+
+    //Biletomat:
+    //Dodać potem
+
+
+    //Generator petentów:
+    //Dodać potem
+
+
+    // ----------- HARMONOGRAM -------------
+
+    sleep(CZAS_DO_OTWARCIA);
+
+    printf("[DYREKTOR] Tp — otwieramy drzwi.");
+
+    // wpuszczamy N osób na semaforze budynku
+    sem_op(semid, SEM_BUDYNEK, MAX_PETENTOW_W_BUDYNKU);
+
+    // praca do Tk
+    sleep(CZAS_PRACY);
+
+    printf("[DYREKTOR] Tk — zamykamy, nowi nie wchodzą.\n");
+
+    sem_p(semid, SEM_MUTEX);
+    shm->koniec_pracy = 1;   // zamknięcie, ale bez ewakuacji
+    sem_v(semid, SEM_MUTEX);
+
+    printf("[DYREKTOR] Frustracja po podanym czasie");
+    sleep(CZAS_PO_ZAMKNIECIU);
+
+    printf("[DYREKTOR] Ewakuacja logiczna.\n");
+    shm->koniec_pracy = 2;
+
+    while (wait(NULL) > 0);
+
+    //Funkcja do czyszczena
+
+    return 0;
+}
+
 void init_ipc() {
     FILE *f = fopen("raport.txt", "w");
     if (f) { fprintf(f, "--- START SYMULACJI ---\n"); fclose(f); }
