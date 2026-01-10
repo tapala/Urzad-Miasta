@@ -67,15 +67,15 @@ int main(){
 
 
     //Generator petentów:
-    generator_pid = fork();                             //Forkujemy mmaina         
-    if (generator_pid == 0) {                           //Jeśli dzieciak to dajemy mu przywilej bycia generatorem, aż do śmierci 
+    generator_pid = fork();                                             //Forkujemy mmaina         
+    if (generator_pid == 0) {                                           //Jeśli dzieciak to dajemy mu przywilej bycia generatorem, aż do śmierci 
 
-        while (shm->koniec_pracy != 1) {                //Generator pracuje do zamknięcia urzędu
+        while (shm->koniec_pracy != 1 & shm->koniec_pracy != 2) {       //Generator pracuje do zamknięcia urzędu
 
-            sem_p(semid, SEM_PETENCI);                  //Opuszczamy semafor naszego bufora petentów w celu zapobiegnięcia nadmiernego wykożystania procesora
+            sem_p(semid, SEM_PETENCI);                                  //Opuszczamy semafor naszego bufora petentów w celu zapobiegnięcia nadmiernego wykożystania procesora
 
-            pid_t child = fork();                       //Forkujemy nasz generator
-            if (child == 0) {                           //Jeśli jest dzieciakiem to przerabiamy go na petenta
+            pid_t child = fork();                                       //Forkujemy nasz generator
+            if (child == 0) {                                           //Jeśli jest dzieciakiem to przerabiamy go na petenta
                 execl("./petent", "petent", NULL);
                 //Jeśli tu jesteśmy, exec jebnął
                 perror("execl petent");
