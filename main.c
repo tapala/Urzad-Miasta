@@ -8,6 +8,7 @@ pid_t generator_pid;
 
 int main(){
 
+    signal(SIGINT, signal_handler);
     //srand(time(NULL));
     init_ipc();
 
@@ -190,6 +191,15 @@ void cleanup() {
     while (wait(NULL) > 0);
 }
 
+
+// Obsługa sygnałów
+void signal_handler(int sig) {
+    if (sig == SIGINT) {
+        printf("\n[DYREKTOR] SIGINT -> ewakuacja.\n");
+        if (shm)
+            shm->koniec_pracy = 2;
+    }
+}
 
 // Funkcje semaforów 
 void sem_op(int semid, int sem_num, int op) { 
