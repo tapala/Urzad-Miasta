@@ -57,7 +57,7 @@ void petent_loop(int shmid, int semid, int msg_bilet_id, int msg_urzad_id) {
     sem_v(semid, SEM_MUTEX);
 
     // Jeśli urząd przestał pracować lub limit został przekroczony i nie jest vipem petent wychodzi z budynku i kończy swój proces
-    if (status > 0 || (!limit_ok && !vip)) {
+    if (status > 0 || !limit_ok) {
         sem_p(semid, SEM_MUTEX);
         shm->liczba_petentow_w_budynku -= zajmowane_miejsca;
         sem_v(semid, SEM_MUTEX);
@@ -96,7 +96,12 @@ void petent_loop(int shmid, int semid, int msg_bilet_id, int msg_urzad_id) {
     while (!zalatwione && shm->koniec_pracy != 2) {
 
         // Wysyłamy petenta do odpowiedniego urzędasa
-        msg.mtype = cel;
+        if (vip) {
+            msg.mtype = cel * 10 + 1;   // Kolejka VIP
+        } else {
+            msg.mtype = cel * 10 + 2;   // Zwykła kolejka
+        }
+
         msg.typ_sprawy = cel;
 
         msgsnd(msg_urzad_id, &msg, sizeof(Komunikat) - sizeof(long), 0);
