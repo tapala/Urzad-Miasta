@@ -7,7 +7,7 @@ pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 int bilet_gotowy = 0;
 int shmid, semid,  msg_bilet_id, msg_urzad_id;
 
-SharedData *g_shm;
+SharedData *shm;
 
 Komunikat msg;
 
@@ -30,19 +30,19 @@ void* opiekun_thread(void *arg)
 {
     // Wejście do kolejki biletowej
     sem_p(semid, SEM_MUTEX);
-    g_shm->kolejka_do_biletow++;
+    shm->kolejka_do_biletow++;
     sem_v(semid, SEM_MUTEX);
 
     // Wysłanie żądania biletu
-    msgsnd(g_msg_bilet_id, &msg_global, sizeof(Komunikat) - sizeof(long), 0);
+    msgsnd(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), 0);
 
     // Odebranie biletu adresowanego do PID petenta
-    msgrcv(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), msg_global.pid_petenta, 0);
+    msgrcv(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), msg.pid_petenta, 0);
 
     // wyjście z kolejki biletowej
-    sem_p(g_semid, SEM_MUTEX);
-    g_shm->kolejka_do_biletow--;
-    sem_v(g_semid, SEM_MUTEX);
+    sem_p(semid, SEM_MUTEX);
+    shm->kolejka_do_biletow--;
+    sem_v(semid, SEM_MUTEX);
 
     // Informacja dla dziecka - wręczenie biletu
     pthread_mutex_lock(&mtx);
@@ -56,8 +56,7 @@ void* opiekun_thread(void *arg)
 void petent_loop() {
 
     // Pamięć współdzielona
-    SharedData *shm = (SharedData*)shmat(shmid, NULL, 0);
-    g_shm = shm;
+    shm = (SharedData*)shmat(shmid, NULL, 0);
 
     // Ustawiamy/losujemy początkowe dane
     pid_t my_pid = getpid();
@@ -104,11 +103,6 @@ void petent_loop() {
         shmdt(shm);
         return;
     }
-
-    // Chcwilowo blokujemy pamięć i zwiększamy liczbę ludzików w kolejce o 1
-    sem_p(semid, SEM_MUTEX);
-    shm->kolejka_do_biletow += 1;
-    sem_v(semid, SEM_MUTEX);
 
     // Tworzymy komunikat...
     msg.mtype = 1;
