@@ -1,25 +1,63 @@
 #include "common.h"
+#include <pthread.h>
 
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+
+int bilet_gotowy = 0;
+int shmid, semid,  msg_bilet_id, msg_urzad_id;
+
+SharedData *g_shm;
+
+Komunikat msg;
 
 int main() {
     srand(time(NULL));
 
     // Inicjalizacja handlerów pamięci współdzielonej i kolejki komunikatów
-    int shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
+    shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
 
-    int semid = semget(ftok(FTOK_PATH, ID_SEM), 2, 0);
-    int msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0);
-    int msg_urzad_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0);
+    semid = semget(ftok(FTOK_PATH, ID_SEM), 2, 0);
+    msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0);
+    msg_urzad_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0);
 
-    petent_loop(shmid, semid, msg_bilet_id, msg_urzad_id);
+    petent_loop();
 
     return 0;
 }
 
-void petent_loop(int shmid, int semid, int msg_bilet_id, int msg_urzad_id) {
+void* opiekun_thread(void *arg)
+{
+    // Wejście do kolejki biletowej
+    sem_p(semid, SEM_MUTEX);
+    g_shm->kolejka_do_biletow++;
+    sem_v(semid, SEM_MUTEX);
+
+    // Wysłanie żądania biletu
+    msgsnd(g_msg_bilet_id, &msg_global, sizeof(Komunikat) - sizeof(long), 0);
+
+    // Odebranie biletu adresowanego do PID petenta
+    msgrcv(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), msg_global.pid_petenta, 0);
+
+    // wyjście z kolejki biletowej
+    sem_p(g_semid, SEM_MUTEX);
+    g_shm->kolejka_do_biletow--;
+    sem_v(g_semid, SEM_MUTEX);
+
+    // Informacja dla dziecka - wręczenie biletu
+    pthread_mutex_lock(&mtx);
+    bilet_gotowy = 1;
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&mtx);
+
+    return NULL;
+}
+
+void petent_loop() {
 
     // Pamięć współdzielona
     SharedData *shm = (SharedData*)shmat(shmid, NULL, 0);
+    g_shm = shm;
 
     // Ustawiamy/losujemy początkowe dane
     pid_t my_pid = getpid();
@@ -56,7 +94,7 @@ void petent_loop(int shmid, int semid, int msg_bilet_id, int msg_urzad_id) {
     // Odblokowywujemy pamięć współdzieloną
     sem_v(semid, SEM_MUTEX);
 
-    // Jeśli urząd przestał pracować lub limit został przekroczony i nie jest vipem petent wychodzi z budynku i kończy swój proces
+    // Jeśli urząd przestał pracować lub limit został przekroczony petent wychodzi z budynku i kończy swój proces
     if (status > 0 || !limit_ok) {
         sem_p(semid, SEM_MUTEX);
         shm->liczba_petentow_w_budynku -= zajmowane_miejsca;
@@ -73,24 +111,47 @@ void petent_loop(int shmid, int semid, int msg_bilet_id, int msg_urzad_id) {
     sem_v(semid, SEM_MUTEX);
 
     // Tworzymy komunikat...
-    Komunikat msg;
     msg.mtype = 1;
     msg.pid_petenta = my_pid;
     msg.jest_vip = vip;
     msg.wiek = wiek;
     msg.wiek_opiekuna = wiek_opiekuna;
+    msg.odeslany_z_sa = 0;
 
-    // ...i wysyłamy do do biletomatu...
-    msgsnd(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), 0);
+    // Jeśli dziecko -> odpal wątek opiekuna
+    if (wiek < 18) {
 
-    // ...po czym pobieramy komunikat zwrotny...
-    msgrcv(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), my_pid, 0);
+        pthread_t th;
+        pthread_create(&th, NULL, opiekun_thread, NULL);
 
-    // ...a na koniec zmniejszamy piczbę petentów w kolejce o 1
-    sem_p(semid, SEM_MUTEX);
-    shm->kolejka_do_biletow -= 1;
-    sem_v(semid, SEM_MUTEX);
+        // Dziecko czeka na rodzica z biletem
+        pthread_mutex_lock(&mtx);
 
+        while (!bilet_gotowy)
+            pthread_cond_wait(&cond, &mtx);
+
+        pthread_mutex_unlock(&mtx);
+
+        pthread_join(th, NULL);
+    }
+    // Dorosły działa jak wcześniej
+    else {
+        
+        sem_p(semid, SEM_MUTEX);
+        shm->kolejka_do_biletow++;
+        sem_v(semid, SEM_MUTEX);
+
+        // Komunikat wysyłamy do do biletomatu...
+        msgsnd(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), 0);
+
+        // ...po czym pobieramy komunikat zwrotny...
+        msgrcv(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), my_pid, 0);
+
+        // ...a na koniec zmniejszamy piczbę petentów w kolejce o 1
+        sem_p(semid, SEM_MUTEX);
+        shm->kolejka_do_biletow--;
+        sem_v(semid, SEM_MUTEX);
+    }
 
     int zalatwione = 0;
     while (!zalatwione && shm->koniec_pracy != 2) {
