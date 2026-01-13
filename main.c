@@ -70,7 +70,14 @@ int main(){
     generator_pid = fork();                                             //Forkujemy mmaina         
     if (generator_pid == 0) {                                           //Jeśli dzieciak to dajemy mu przywilej bycia generatorem, aż do śmierci 
 
-        while (shm->koniec_pracy != 1 & shm->koniec_pracy != 2) {       //Generator pracuje do zamknięcia urzędu
+        while (1) {                                                     //Generator pracuje do zamknięcia urzędu
+
+            //Generator pracuje do zamknięcia urzędu
+            sem_p(semid, SEM_MUTEX);
+            int status = shm->koniec_pracy;
+            sem_v(semid, SEM_MUTEX);
+
+            if (status == 1 || status == 2) break;
 
             sem_p(semid, SEM_PETENCI);                                  //Opuszczamy semafor naszego bufora petentów w celu zapobiegnięcia nadmiernego wykożystania procesora
 
