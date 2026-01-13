@@ -27,7 +27,6 @@ void start_urzednik(int typ_wydzialu, int limit_dzienny) {
         if (stan == 2)
             break;   
 
-
         //  PRIORYTET VIP w kolejce do urzędnika
         long vip_type    = typ_wydzialu * 10 + 1;
         long normal_type = typ_wydzialu * 10 + 2;
@@ -71,11 +70,64 @@ void start_urzednik(int typ_wydzialu, int limit_dzienny) {
         else
             printf("[URZĘDNIK] Obsługa dorosłego(PID %d)\n", typ_wydzialu, msg.wiek, msg.pid_petenta);
 
-        usleep(rand() % 150000 + 50000);
+        // Symulacja obsługi czasu
+        //usleep(rand() % 150000 + 50000);
 
-        
+
+        // Przekierowania
+        int przekierowanie = 0;
+        int cel = 0;
+
+        // Jeśli urząd funkcjonuje
+        if (stan == 0) {
+
+            // Z SA losowo do innych
+            if (typ_wydzialu == DEPT_SA && !msg.odeslany_z_sa && (rand() % 100 < 40))
+            {
+                przekierowanie = 1;
+                cel = (rand() % 4) + 2;  // SC, KM, ML, PD
+            }
+            // Z innych do kasy
+            else if (typ_wydzialu != DEPT_SA && typ_wydzialu != DEPT_KASA && (rand() % 100 < 10))
+            {
+                przekierowanie = 1;
+                cel = DEPT_KASA;
+            }
+        }
+
+        // Odpowiadamy petentowy
+
+        msg.mtype = msg.pid_petenta;
+
+        if (przekierowanie) {
+            // Przy przekierowaniu do wiadomości dodajemy cel przekierowania
+            msg.typ_sprawy = cel;
+
+            
+            if (typ_wydzialu == DEPT_SA)
+                msg.odeslany_z_sa = 1;
+
+            sprintf(log_buf, "RAPORT: WYDZIAŁ %d przekierował PID %d do %d\n", typ_wydzialu, msg.pid_petenta, cel);
+
+            log_to_file(log_buf);
+        }
+        else {
+            // Sprawa załatwiona
+            msg.typ_sprawy = 0;
+            obsluzeni++;
+
+            // Zmniejszenie limitu w SHM
+            sem_p(semid, SEM_MUTEX);
+            if (shm->limity_przyjec[typ_wydzialu] > 0)
+                shm->limity_przyjec[typ_wydzialu]--;
+            sem_v(semid, SEM_MUTEX);
+        }
+
+        // Odsyłamy wiadomość
+        msgsnd(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), 0);
     }
 
-
+    // Odłączenie pamięci współdzielonej po zakończeniu loopa - ewakuacja
+    shmdt(shm);
     
 }
