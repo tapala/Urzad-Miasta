@@ -148,7 +148,13 @@ void petent_loop() {
     }
 
     int zalatwione = 0;
-    while (!zalatwione && shm->koniec_pracy != 2) {
+    while (!zalatwione) {
+
+        sem_p(semid, SEM_MUTEX);
+        int status = shm->koniec_pracy;
+        sem_v(semid, SEM_MUTEX);
+
+        if (status == 2) break;
 
         // Wysyłamy petenta do odpowiedniego urzędasa
         if (vip) {
@@ -180,6 +186,7 @@ void petent_loop() {
     sem_v(semid, SEM_MUTEX);
 
     sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca);
+    sem_v(semid, SEM_PETENCI);
 
     shmdt(shm);
 }
