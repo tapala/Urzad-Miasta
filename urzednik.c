@@ -3,11 +3,11 @@
 void start_urzednik(int typ_wydzialu, int limit_dzienny) {
 
     // Inicjalizacja pamięci, semaforów, kolejki komunikatów
-    int shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0666);
+    int shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600);
     SharedData *shm = (SharedData*)shmat(shmid, NULL, 0);
 
-    int semid = semget(ftok(FTOK_PATH, ID_SEM), 2, 0666);
-    int msg_urzad = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0666);
+    int semid = semget(ftok(FTOK_PATH, ID_SEM), 2, 0600);
+    int msg_urzad = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0600);
 
     // Podstawowy syf
     int obsluzeni = 0;

@@ -137,18 +137,18 @@ void init_ipc() {
     if (f) { fprintf(f, "--- START SYMULACJI ---\n"); fclose(f); }
 
     //Utworzenie pamięci współdzielonej
-    shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0666 | IPC_CREAT);
+    shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600 | IPC_CREAT);
     shm = (SharedData*)shmat(shmid, NULL, 0);
     
     //Utworzenie tablicy 3 semaforów i przypisanie im wstępnych wartości
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 3, 0666 | IPC_CREAT);
+    semid = semget(ftok(FTOK_PATH, ID_SEM), 3, 0600 | IPC_CREAT);
     semctl(semid, SEM_MUTEX, SETVAL, 1);                        //Nasz Mutexik
     semctl(semid, SEM_BUDYNEK, SETVAL, 0);                      //Wpuszczanie do budynku
     semctl(semid, SEM_PETENCI, SETVAL, MAX_PROCESOW_PETENTOW);  //Ogranicznik petentów
 
     //Utworzenie kolejek komunikatów
-    msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0666 | IPC_CREAT);
-    msg_urzad_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0666 | IPC_CREAT);
+    msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0600 | IPC_CREAT);
+    msg_urzad_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0600 | IPC_CREAT);
 
     
     //Ustawiamy wartości pamięci współdzielonej na nasze stałe
