@@ -1,12 +1,18 @@
 #include "common.h"
 
+int main(int argc, char **argv) {
+    int typ_wydzialu = atoi(argv[1]);
+    int limit = atoi(argv[2]);
+    start_urzednik(typ_wydzialu, limit);
+}
+
 void start_urzednik(int typ_wydzialu, int limit_dzienny) {
 
     // Inicjalizacja pamięci, semaforów, kolejki komunikatów
     int shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600);
     SharedData *shm = (SharedData*)shmat(shmid, NULL, 0);
 
-    int semid = semget(ftok(FTOK_PATH, ID_SEM), 2, 0600);
+    int semid = semget(ftok(FTOK_PATH, ID_SEM), 3, 0600);
     int msg_urzad = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0600);
 
     // Podstawowy syf
@@ -68,7 +74,7 @@ void start_urzednik(int typ_wydzialu, int limit_dzienny) {
         else if (msg.wiek < 18)
             printf("[URZĘDNIK] Obsługa dziecka z opiekunem(PID %d)\n", msg.pid_petenta);
         else
-            printf("[URZĘDNIK] Obsługa dorosłego(PID %d)\n", typ_wydzialu, msg.wiek, msg.pid_petenta);
+            printf("[URZĘDNIK] Obsługa dorosłego(PID %d)\n", typ_wydzialu);
 
         // Symulacja obsługi czasu
         //usleep(rand() % 150000 + 50000);

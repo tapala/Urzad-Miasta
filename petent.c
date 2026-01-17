@@ -11,13 +11,16 @@ SharedData *shm;
 
 Komunikat msg;
 
+void petent_loop(void);
+void* opiekun_thread(void *arg);
+
 int main() {
     srand(time(NULL));
 
     // Inicjalizacja handlerów pamięci współdzielonej i kolejki komunikatów
     shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
 
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 2, 0);
+    semid = semget(ftok(FTOK_PATH, ID_SEM), 3, 0);
     msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0);
     msg_urzad_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0);
 

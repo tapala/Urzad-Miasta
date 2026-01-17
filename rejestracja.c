@@ -1,10 +1,23 @@
 #include "common.h"
 #include <signal.h>
+#include <sys/wait.h>
 
 #define MAX_KASY 3
 
 pid_t kasy[MAX_KASY];
 int liczba_kas = 0;
+
+void kasa_loop(){
+    int msg_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0);
+    Komunikat msg;
+
+    while (1) {
+        if (msgrcv(msg_id, &msg, sizeof(Komunikat) - sizeof(long), 1, 0) == -1)
+            continue;
+        msg.mtype = msg.pid_petenta;
+        msgsnd(msg_id, &msg, sizeof(Komunikat) - sizeof(long), 0);
+    }
+}
 
 void uruchom_kase(){
     if (liczba_kas >= MAX_KASY)
@@ -32,21 +45,10 @@ void zamknij_kase() {
     waitpid(pid, NULL, 0);
 }
 
-void kasa_loop(){
-    int msg_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0);
-    Komunikat msg;
-
-    while (1) {
-        if (msgrcv(msg_id, &msg, sizeof(Komunikat) - sizeof(long), 1, 0) == -1)
-            continue;
-        msg.mtype = msg.pid_petenta;
-        msgsnd(msg_id, &msg, sizeof(Komunikat) - sizeof(long), 0);
-    }
-}
 
 int main() {
     int shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
-    int semid = semget(ftok(FTOK_PATH, ID_SEM), 2, 0);
+    int semid = semget(ftok(FTOK_PATH, ID_SEM), 3, 0);
 
     SharedData *shm = shmat(shmid, NULL, 0);
 

@@ -5,6 +5,10 @@ int shmid, semid, msg_bilet_id, msg_urzad_id;
 SharedData *shm;
 pid_t generator_pid;
 
+void signal_handler(int sig);
+void init_ipc(void);
+void run_urzednik(int dept, int limit);
+void cleanup(void);
 
 int main(){
 
@@ -16,43 +20,43 @@ int main(){
 
     //Urzędnicy:
     if (!fork()) { 
-        start_urzednik(DEPT_SA, LIMIT_SA);
+        run_urzednik(DEPT_SA, LIMIT_SA);
         perror("execl SA");
         exit(0); 
     }
 
     if (!fork()) { 
-        start_urzednik(DEPT_SA, LIMIT_SA);
+        run_urzednik(DEPT_SA, LIMIT_SA);
         perror("execl SA");
         exit(0); 
     }
 
     if (!fork()) { 
-        start_urzednik(DEPT_SC, LIMIT_SC);
+        run_urzednik(DEPT_SC, LIMIT_SC);
         perror("execl SC");
         exit(0); 
     }
     
     if (!fork()) { 
-        start_urzednik(DEPT_KM, LIMIT_KM);
+        run_urzednik(DEPT_KM, LIMIT_KM);
         perror("execl KM");
         exit(0); 
     }
 
     if (!fork()) { 
-        start_urzednik(DEPT_ML, LIMIT_ML);
+        run_urzednik(DEPT_ML, LIMIT_ML);
         perror("execl ML");
         exit(0); 
     }
 
     if (!fork()) { 
-        start_urzednik(DEPT_PD, LIMIT_PD);
+        run_urzednik(DEPT_PD, LIMIT_PD);
         perror("execl PD");
         exit(0); 
     }
 
     if (!fork()) { 
-        start_urzednik(DEPT_KASA, LIMIT_KASA);
+        run_urzednik(DEPT_KASA, LIMIT_KASA);
         perror("execl kasa");
         exit(0); 
     }
@@ -125,7 +129,7 @@ int main(){
     while (wait(NULL) > 0); 
 
     //Funkcja do czyszczena
-    cleanup()
+    cleanup();
 
     return 0;
 }
@@ -167,7 +171,7 @@ void init_ipc() {
 }
 
 //Funkcja do forkowania urzędników
-void start_urzednik(const char *dept, int limit) {
+void run_urzednik(const char *dept, int limit) {
     if (!fork()) {
         char lim[10];
         sprintf(lim, "%d", limit);
@@ -229,4 +233,4 @@ void log_to_file(const char *msg) {
         fprintf(f, "%s", msg); 
         fclose(f); 
     } 
-}W
+}
