@@ -7,12 +7,29 @@ pid_t kasy[MAX_KASY];
 int liczba_kas = 0;
 
 void uruchom_kase(){
-    // Uruchomienie kasy
+    if (liczba_kas >= MAX_KASY)
+        return;
+
+    // Rejestracja robi podział komórkowy i rozkazuje bachorowi dymać na kasie
+    pid_t pid = fork();
+    if (pid == 0) {
+        kasa_loop();
+        exit(0);
+    }
+
+    // Inkrement kas i zapisanie do sigkilla
+    kasy[liczba_kas++] = pid;
 }
 
 
 void zamknij_kase() {
-    // Zamykanie kasy
+    if (liczba_kas <= 0)
+        return;
+
+    // Dekrement i wczytanie pidu do auto-kasacji
+    pid_t pid = kasy[--liczba_kas];
+    kill(pid, SIGTERM);
+    waitpid(pid, NULL, 0);
 }
 
 void kasa_loop(){
