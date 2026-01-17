@@ -28,19 +28,24 @@ int main() {
     printf("[REJESTRACJA] System biletowy uruchomiony\n");
 
     while (1) {
+
+        // Wcztanie z pamięci współdzielonej
         sem_p(semid, SEM_MUTEX);
         int kolejka = shm->kolejka_do_biletow;
         int status = shm->koniec_pracy;
         sem_v(semid, SEM_MUTEX);
 
+        // Ewakuacja
         if (status == 2) {
             break;
         }
 
+        // Wyliczenie K
         int N = MAX_PETENTOW_W_BUDYNKU;
         int K = N / 3;
         if (K < 1) K = 1;
 
+        // Ustalenie liczby docelowej kas
         int docelowe = 1;
         if (kolejka > 2 * K) docelowe = 3;
         else if (kolejka > K) docelowe = 2;
@@ -52,6 +57,7 @@ int main() {
         if (liczba_kas == 2 && kolejka < K)
             docelowe = 1;
 
+        // Nadgonienie liczby otwartych kas do liczby docelowej
         while (liczba_kas < docelowe)
             uruchom_kase();
 
