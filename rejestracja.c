@@ -16,7 +16,15 @@ void zamknij_kase() {
 }
 
 void kasa_loop(){
-    // Pętla pracy kasy
+    int msg_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0);
+    Komunikat msg;
+
+    while (1) {
+        if (msgrcv(msg_id, &msg, sizeof(Komunikat) - sizeof(long), 1, 0) == -1)
+            continue;
+        msg.mtype = msg.pid_petenta;
+        msgsnd(msg_id, &msg, sizeof(Komunikat) - sizeof(long), 0);
+    }
 }
 
 int main() {
