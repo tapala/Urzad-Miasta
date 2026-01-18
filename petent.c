@@ -31,6 +31,7 @@ int main() {
 
 void* opiekun_thread(void *arg)
 {
+    (void)arg;
     // Wejście do kolejki biletowej
     sem_p(semid, SEM_MUTEX);
     shm->kolejka_do_biletow++;

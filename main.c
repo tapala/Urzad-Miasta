@@ -119,7 +119,7 @@ int main(){
     shm->koniec_pracy = 1;   //Zamknięcie, ale bez ewakuacji
     sem_v(semid, SEM_MUTEX);
 
-    printf("[DYREKTOR] Frustracja po podanym czasie");
+    printf("[DYREKTOR] Frustracja po podanym czasie\n");
     sleep(CZAS_PO_ZAMKNIECIU);
 
     printf("[DYREKTOR] Ewakuacja logiczna.\n");
@@ -171,14 +171,17 @@ void init_ipc() {
 }
 
 //Funkcja do forkowania urzędników
-void run_urzednik(const char *dept, int limit) {
-    if (!fork()) {
-        char lim[10];
-        sprintf(lim, "%d", limit);
-        execl("./urzednik", "urzednik", dept, lim, NULL);
-        perror("execl urzednik");
-        exit(1);
-    }
+void run_urzednik(int dept, int limit) {
+    char dept_str[16];
+    char limit_str[16];
+
+    snprintf(dept_str, sizeof(dept_str), "%d", dept);
+    snprintf(limit_str, sizeof(limit_str), "%d", limit);
+
+    execl("./urzednik", "urzednik", dept_str, limit_str, NULL);
+
+    perror("execl urzednik");
+    exit(1);
 }
 
 

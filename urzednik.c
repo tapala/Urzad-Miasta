@@ -1,5 +1,7 @@
 #include "common.h"
 
+void start_urzednik(int typ_wydzialu, int limit_dzienny);
+
 int main(int argc, char **argv) {
     int typ_wydzialu = atoi(argv[1]);
     int limit = atoi(argv[2]);
@@ -20,7 +22,7 @@ void start_urzednik(int typ_wydzialu, int limit_dzienny) {
     Komunikat msg;
     char log_buf[256];
 
-    printf("[URZĘDNIK] Rozpoczyna pracę.");
+    printf("[URZĘDNIK %d] Rozpoczyna pracę.\n", typ_wydzialu);
 
     while (1)
     {
@@ -74,10 +76,10 @@ void start_urzednik(int typ_wydzialu, int limit_dzienny) {
         else if (msg.wiek < 18)
             printf("[URZĘDNIK] Obsługa dziecka z opiekunem(PID %d)\n", msg.pid_petenta);
         else
-            printf("[URZĘDNIK] Obsługa dorosłego(PID %d)\n", typ_wydzialu);
+            printf("[URZĘDNIK] Obsługa dorosłego(PID %d)\n", msg.pid_petenta);
 
         // Symulacja obsługi czasu
-        //usleep(rand() % 150000 + 50000);
+        //usleep(1000);
 
 
         // Przekierowania
