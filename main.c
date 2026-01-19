@@ -1,7 +1,7 @@
 #include "common.h"
 
 
-int shmid, semid, msg_bilet_id, msg_urzad_id;
+int shmid, semid, msg_bilet_id, msg_bilet_back_id, msg_urzad_id, msg_urzad_back_id;
 SharedData *shm;
 pid_t generator_pid;
 
@@ -16,7 +16,7 @@ int main(){
     //srand(time(NULL));
     init_ipc();
 
-    printf("[DYREKTOR] System startuje. Czekamy na Tp - drzwi zamknięte.");
+    printf("[DYREKTOR] System startuje. Czekamy na Tp - drzwi zamknięte.\n");
 
     //Urzędnicy:
     if (!fork()) { 
@@ -72,31 +72,63 @@ int main(){
 
     //Generator petentów:
     generator_pid = fork();                                             //Forkujemy mmaina         
-    if (generator_pid == 0) {                                           //Jeśli dzieciak to dajemy mu przywilej bycia generatorem, aż do śmierci 
-
+    if (!generator_pid) {                                           //Jeśli dzieciak to dajemy mu przywilej bycia generatorem, aż do śmierci 
+        signal(SIGCHLD, signal_handler);
         while (1) {                                                     //Generator pracuje do zamknięcia urzędu
-
             //Generator pracuje do zamknięcia urzędu
             sem_p(semid, SEM_MUTEX);
             int status = shm->koniec_pracy;
             sem_v(semid, SEM_MUTEX);
 
             if (status == 1 || status == 2) break;
+            //while (waitpid(-1, NULL, WNOHANG) > 0) {}
 
-            sem_p(semid, SEM_PETENCI);                                  //Opuszczamy semafor naszego bufora petentów w celu zapobiegnięcia nadmiernego wykożystania procesora
-
+            // Opuszczamy semafor naszego bufora petentów w celu zapobiegnięcia nadmiernego wykożystania procesora
+            struct sembuf s; 
+            s.sem_num = SEM_PETENCI; 
+            s.sem_op = -1; 
+            s.sem_flg = IPC_NOWAIT; 
+            if (semop(semid, &s, 1) == -1){
+                if(errno == EAGAIN){
+                    fprintf(stderr,"%s -- %s -- Generator wykona nie robi wincyj petentow => %d \n", strerror(errno),__FILE__,__LINE__);
+                    break;
+                }
+                else if (errno != EIDRM && errno != EINVAL) {
+                    perror("semop");
+                }
+            }                           
+            //usleep(1000);
             pid_t child = fork();                                       //Forkujemy nasz generator
-            if (child == 0) {                                           //Jeśli jest dzieciakiem to przerabiamy go na petenta
-                execl("./petent", "petent", NULL);
+            if (child == -1){
+                fprintf(stderr,"%s -- %s -- Wyjebka na Generator => %d \n", strerror(errno),__FILE__,__LINE__);
+            }
+            if (!child) {   
+                unsigned int seed = time(NULL) ^ (getpid() << 16);
+                srand(seed);
+                int r = rand() % 100;
+                int cel;
+                if (r < 60) cel = DEPT_SA;
+                else if (r < 70) cel = DEPT_SC;
+                else if (r < 80) cel = DEPT_KM;
+                else if (r < 90) cel = DEPT_ML;
+                else cel = DEPT_PD;                                    //Jeśli jest dzieciakiem to przerabiamy go na petenta
+                char huj[16];
+                //sem_p(semid, SEM_MUTEX);
+                //printf("PID: %d; CEL: %d; LIMIT: %d\n", getpid(), cel,shm->limity_przyjec[cel]);
+                //fflush(stdout);
+                sem_v(semid, SEM_MUTEX);
+                snprintf(huj, sizeof(huj), "%d", cel);
+                execl("./petent", "petent", huj ,NULL);
                 //Jeśli tu jesteśmy, exec jebnął
                 perror("execl petent");
                 exit(1);
             }
 
+            //printf("Wygenerowano petenta o id = %d\n", child);
             //Gdyby ktoś chciał to jest lekki opóźniacz do generatora petentów
             //usleep((rand() % 400 + 100) * 10);
         }
-
+        while(wait(NULL)>0);
         exit(0);
     }
 
@@ -106,30 +138,36 @@ int main(){
     sleep(CZAS_DO_OTWARCIA);
 
     printf("[DYREKTOR] Tp — otwieramy drzwi.");
+    fflush(stdout);
 
     //Wpuszczamy N osób na semaforze budynku
-    sem_op(semid, SEM_BUDYNEK, MAX_PETENTOW_W_BUDYNKU);
+    sem_op(semid, SEM_BUDYNEK, MAX_PETENTOW_W_BUDYNKU, 0);
 
     //Praca do Tk
     sleep(CZAS_PRACY);
 
     printf("[DYREKTOR] Tk — zamykamy, nowi nie wchodzą.\n");
+    fflush(stdout);
 
     sem_p(semid, SEM_MUTEX);
     shm->koniec_pracy = 1;   //Zamknięcie, ale bez ewakuacji
     sem_v(semid, SEM_MUTEX);
 
-    printf("[DYREKTOR] Frustracja po podanym czasie\n");
     sleep(CZAS_PO_ZAMKNIECIU);
-
+    printf("[DYREKTOR] Frustracja po podanym czasie\n");
+    fflush(stdout);
     printf("[DYREKTOR] Ewakuacja logiczna.\n");
-    shm->koniec_pracy = 2;
+    fflush(stdout);
 
-    //Czekam na dziecki
-    while (wait(NULL) > 0); 
+    sem_p(semid, SEM_MUTEX);
+    shm->koniec_pracy = 2;
+    sem_v(semid, SEM_MUTEX);
 
     //Funkcja do czyszczena
     cleanup();
+
+    //Czekam na dziecki
+    //while (wait(NULL) > 0); 
 
     return 0;
 }
@@ -145,14 +183,17 @@ void init_ipc() {
     shm = (SharedData*)shmat(shmid, NULL, 0);
     
     //Utworzenie tablicy 3 semaforów i przypisanie im wstępnych wartości
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 3, 0600 | IPC_CREAT);
+    semid = semget(ftok(FTOK_PATH, ID_SEM), 4, 0600 | IPC_CREAT);
     semctl(semid, SEM_MUTEX, SETVAL, 1);                        //Nasz Mutexik
     semctl(semid, SEM_BUDYNEK, SETVAL, 0);                      //Wpuszczanie do budynku
     semctl(semid, SEM_PETENCI, SETVAL, MAX_PROCESOW_PETENTOW);  //Ogranicznik petentów
+    semctl(semid, SEM_MAX_BUDYNEK, SETVAL, (LIMIT_KM + LIMIT_ML + LIMIT_PD + LIMIT_SA + LIMIT_SC));
 
     //Utworzenie kolejek komunikatów
     msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0600 | IPC_CREAT);
+    msg_bilet_back_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0600 | IPC_CREAT);
     msg_urzad_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0600 | IPC_CREAT);
+    msg_urzad_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_BACK), 0600 | IPC_CREAT);
 
     
     //Ustawiamy wartości pamięci współdzielonej na nasze stałe
@@ -194,8 +235,10 @@ void cleanup() {
     shmctl(shmid, IPC_RMID, NULL);              //Usunięcie segmentu pamięci współ.
     semctl(semid, 0, IPC_RMID);                 //Usunięcie semaforów
     msgctl(msg_bilet_id, IPC_RMID, NULL);
+
     //Usuwanie kolejek komunikatów
     msgctl(msg_urzad_id, IPC_RMID, NULL);
+    msgctl(msg_urzad_back_id, IPC_RMID, NULL);
 
     // zabij generator jeśli jeszcze działa
     if (generator_pid > 0)
@@ -212,5 +255,8 @@ void signal_handler(int sig) {
         printf("\n[DYREKTOR] SIGINT -> ewakuacja.\n");
         if (shm)
             shm->koniec_pracy = 2;
+    }
+    else if (sig == SIGCHLD){
+        wait(NULL);
     }
 }
