@@ -110,7 +110,7 @@ int main() {
         while (liczba_kas < docelowe)
             uruchom_kase();
 
-        /while (liczba_kas > docelowe)
+        while (liczba_kas > docelowe)
             zamknij_kase();
 
     }
