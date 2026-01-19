@@ -14,8 +14,11 @@ void start_urzednik(int typ_wydzialu, int limit_dzienny) {
     int shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600);
     SharedData *shm = (SharedData*)shmat(shmid, NULL, 0);
 
-    int semid = semget(ftok(FTOK_PATH, ID_SEM), 3, 0600);
+    int semid = semget(ftok(FTOK_PATH, ID_SEM), 4, 0600);
+    int msg_bilet = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0600);
+    int msg_bilet_back = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0600);
     int msg_urzad = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0600);
+    int msg_urzad_back = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_BACK), 0600);
 
     // Podstawowy syf
     int obsluzeni = 0;
@@ -49,6 +52,9 @@ void start_urzednik(int typ_wydzialu, int limit_dzienny) {
             {
                 if (errno == ENOMSG && stan == 1)
                     break; // Koniec dnia + pusta kolejka
+                else if(errno != ENOMSG){
+                    perror("Wyjebka message queue");
+                }
 
                 continue;  // Nic do roboty więc czeka dalej
             }
@@ -59,11 +65,13 @@ void start_urzednik(int typ_wydzialu, int limit_dzienny) {
             // Logujemy do pliku przekroczony limit dzienny
             sprintf(log_buf, "RAPORT: WYDZIAŁ %d odrzucił PID %d (limit wyczerpany)\n", typ_wydzialu, msg.pid_petenta);
             log_to_file(log_buf);
-
+            printf("[URZĘDNIK %d] Limit osiągniety - wyjebalem petenta(PID %d)\n", typ_wydzialu, msg.pid_petenta);
             msg.mtype = msg.pid_petenta;
-            msg.typ_sprawy = -1;
+            msg.typ_sprawy = LIMIT_OSIAGNIETY;
 
-            msgsnd(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), 0);
+            if(msgsnd(msg_urzad_back, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
+                fprintf(stderr,"%s - Wyjebka na msgqueue - %d \n", strerror(errno), __LINE__);
+            }
 
             continue;
         }
@@ -72,11 +80,11 @@ void start_urzednik(int typ_wydzialu, int limit_dzienny) {
         // Komunikaty informacyjne
 
         if (msg.jest_vip)
-            printf("[URZĘDNIK] OBSŁUGA VIP PID %d\n", msg.pid_petenta);
+            printf("[URZĘDNIK %d] OBSŁUGA VIP PID %d\n", typ_wydzialu, msg.pid_petenta);
         else if (msg.wiek < 18)
-            printf("[URZĘDNIK] Obsługa dziecka z opiekunem(PID %d)\n", msg.pid_petenta);
+            printf("[URZĘDNIK %d] Obsługa dziecka z opiekunem(PID %d)\n", typ_wydzialu, msg.pid_petenta);
         else
-            printf("[URZĘDNIK] Obsługa dorosłego(PID %d)\n", msg.pid_petenta);
+            printf("[URZĘDNIK %d] Obsługa dorosłego(PID %d)\n", typ_wydzialu, msg.pid_petenta);
 
         // Symulacja obsługi czasu
         //usleep(1000);
@@ -104,7 +112,6 @@ void start_urzednik(int typ_wydzialu, int limit_dzienny) {
         }
 
         // Odpowiadamy petentowy
-
         msg.mtype = msg.pid_petenta;
 
         if (przekierowanie) {
@@ -115,6 +122,21 @@ void start_urzednik(int typ_wydzialu, int limit_dzienny) {
             if (typ_wydzialu == DEPT_SA)
                 msg.odeslany_z_sa = 1;
 
+            if(cel != DEPT_KASA){
+                msg.mtype = 1;
+                if(msgsnd(msg_bilet, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
+                    fprintf(stderr,"%s - Wyjebka na msgsnd - SA => Kasa - %s => %d \n", strerror(errno), __FILE__,__LINE__);
+                }
+
+                if(msgrcv(msg_bilet_back, &msg, sizeof(Komunikat) - sizeof(long), msg.pid_petenta, 0) == -1){
+                    fprintf(stderr,"%s - Wyjebka na msgrcv - Kasa => SA - %s => %d \n", strerror(errno), __FILE__,__LINE__);
+                }
+
+                if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
+                    // Brak miejsc - wpis do raportu dziennego
+                }
+            }
+            
             sprintf(log_buf, "RAPORT: WYDZIAŁ %d przekierował PID %d do %d\n", typ_wydzialu, msg.pid_petenta, cel);
 
             log_to_file(log_buf);
@@ -122,19 +144,15 @@ void start_urzednik(int typ_wydzialu, int limit_dzienny) {
         else {
             // Sprawa załatwiona
             msg.typ_sprawy = 0;
-            obsluzeni++;
-
-            // Zmniejszenie limitu w SHM
-            sem_p(semid, SEM_MUTEX);
-            if (shm->limity_przyjec[typ_wydzialu] > 0)
-                shm->limity_przyjec[typ_wydzialu]--;
-            sem_v(semid, SEM_MUTEX);
         }
 
+        obsluzeni++;
         // Odsyłamy wiadomość
-        msgsnd(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), 0);
+        if(msgsnd(msg_urzad_back, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
+            fprintf(stderr,"%s - Wyjebka na msgqueue - %d \n", strerror(errno), __LINE__);
+        }
     }
-
+    printf("[URZEDNIK %d] Koniec - obsluzeni: %d\n",typ_wydzialu, obsluzeni);
     // Odłączenie pamięci współdzielonej po zakończeniu loopa - ewakuacja
     shmdt(shm);
     

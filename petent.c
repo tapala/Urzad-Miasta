@@ -1,29 +1,40 @@
 #include "common.h"
 #include <pthread.h>
+#include <stdatomic.h>
 
 pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
-int bilet_gotowy = 0;
-int shmid, semid,  msg_bilet_id, msg_urzad_id;
+atomic_int bilet_gotowy = 0;
+int shmid, semid,  msg_bilet_id, msg_bilet_back_id, msg_urzad_id, msg_urzad_back_id, cel;
+pid_t my_pid;
 
 SharedData *shm;
 
 Komunikat msg;
 
-void petent_loop(void);
+void petent_loop();
 void* opiekun_thread(void *arg);
 
-int main() {
-    srand(time(NULL));
+void dzong(){
+    fprintf(stderr,"[%d] Im dead\n", getpid());
+}
+
+int main(int argc, char** argv) {
+    //atexit(dzong);
+    unsigned int seed = time(NULL) ^ (getpid() << 16);
+    srand(seed);
 
     // Inicjalizacja handlerów pamięci współdzielonej i kolejki komunikatów
     shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
 
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 3, 0);
+    semid = semget(ftok(FTOK_PATH, ID_SEM), 4, 0);
     msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0);
+    msg_bilet_back_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0);
     msg_urzad_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0);
+    msg_urzad_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_BACK), 0600);
 
+    cel = atoi(argv[1]);
     petent_loop();
 
     return 0;
@@ -38,10 +49,19 @@ void* opiekun_thread(void *arg)
     sem_v(semid, SEM_MUTEX);
 
     // Wysłanie żądania biletu
-    msgsnd(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), 0);
+    if(msgsnd(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
+        fprintf(stderr,"%s - Wyjebka na msgsnd - Kasa - %s => %d \n", strerror(errno), __FILE__,__LINE__);
+    }
 
     // Odebranie biletu adresowanego do PID petenta
-    msgrcv(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), msg.pid_petenta, 0);
+    if(msgrcv(msg_bilet_back_id, &msg, sizeof(Komunikat) - sizeof(long), msg.pid_petenta, 0) == -1){
+        fprintf(stderr,"%s - Wyjebka na msgrcv - Kasa - %s => %d \n", strerror(errno), __FILE__,__LINE__);
+    }
+
+    if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
+        printf("[PETENT %d] Brak miejsc u urzednika %d. Z zalupopelniam sudoku \n", my_pid, cel);
+        exit(1);
+    }
 
     // wyjście z kolejki biletowej
     sem_p(semid, SEM_MUTEX);
@@ -63,8 +83,8 @@ void petent_loop() {
     shm = (SharedData*)shmat(shmid, NULL, 0);
 
     // Ustawiamy/losujemy początkowe dane
-    pid_t my_pid = getpid();
-    int cel = 0;
+    my_pid = getpid();
+    //int cel = 0;
     int vip = (rand() % 100 < 2);
 
     // Obsługa wieku
@@ -77,16 +97,9 @@ void petent_loop() {
         zajmowane_miejsca = 2;
     }
 
-    // Wybieramy gdzie petent ma pójść
-    int r = rand() % 100;
-    if (r < 60) cel = DEPT_SA;
-    else if (r < 70) cel = DEPT_SC;
-    else if (r < 80) cel = DEPT_KM;
-    else if (r < 90) cel = DEPT_ML;
-    else cel = DEPT_PD;
-
     // Opuszczamy semafor budynku i blokujemy pamięć współdzieloną
-    sem_op(semid, SEM_BUDYNEK, -zajmowane_miejsca);
+
+    sem_op(semid, SEM_BUDYNEK, -zajmowane_miejsca, 0);
     sem_p(semid, SEM_MUTEX);
 
     //Zwiększamy liczbę petentów w budynku i patrzymy czy nie przekraczamy limitu departamentu oraz wyciągamy flagę pracy urzędu
@@ -98,23 +111,27 @@ void petent_loop() {
     sem_v(semid, SEM_MUTEX);
 
     // Jeśli urząd przestał pracować lub limit został przekroczony petent wychodzi z budynku i kończy swój proces
+    //printf("Status: %d; Limit_ok: %d; CEL: %d\n", status, limit_ok, cel);
+    //fflush(stdout);
     if (status > 0 || !limit_ok) {
         sem_p(semid, SEM_MUTEX);
         shm->liczba_petentow_w_budynku -= zajmowane_miejsca;
         sem_v(semid, SEM_MUTEX);
 
-        sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca);
+        sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0);
         shmdt(shm);
         return;
     }
-
     // Tworzymy komunikat...
     msg.mtype = 1;
     msg.pid_petenta = my_pid;
+    msg.typ_sprawy = cel;
     msg.jest_vip = vip;
     msg.wiek = wiek;
     msg.wiek_opiekuna = wiek_opiekuna;
     msg.odeslany_z_sa = 0;
+
+    //printf("[PETENT %d] Utworzono petenta : %d, %d, %d", my_pid, wiek, wiek_opiekuna, vip);
 
     // Jeśli dziecko -> odpal wątek opiekuna
     if (wiek < 18) {
@@ -140,10 +157,19 @@ void petent_loop() {
         sem_v(semid, SEM_MUTEX);
 
         // Komunikat wysyłamy do do biletomatu...
-        msgsnd(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), 0);
+        if(msgsnd(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
+            fprintf(stderr,"%s -- %d -- Wyjebka na msgsend - Kasa - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+        }
 
         // ...po czym pobieramy komunikat zwrotny...
-        msgrcv(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), my_pid, 0);
+        if(msgrcv(msg_bilet_back_id, &msg, sizeof(Komunikat) - sizeof(long), my_pid, 0) == -1){
+            fprintf(stderr,"%s -- %d -- Wyjebka na msgrcv - Kasa - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+        }
+
+        if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
+            printf("[PETENT %d] Brak miejsc u urzednika %d. Z zalupopelniam sudoku \n", my_pid, cel);
+            exit(1);
+        }
 
         // ...a na koniec zmniejszamy piczbę petentów w kolejce o 1
         sem_p(semid, SEM_MUTEX);
@@ -169,14 +195,17 @@ void petent_loop() {
 
         msg.typ_sprawy = cel;
 
-        msgsnd(msg_urzad_id, &msg, sizeof(Komunikat) - sizeof(long), 0);
+        if(msgsnd(msg_urzad_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
+            fprintf(stderr,"%s -- %d -- Wyjebka na msgsend - Urzednik - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+        }
 
         // Jeśli komunikat się nie powiedzie to przerywamy pętlę
-        if (msgrcv(msg_urzad_id, &msg, sizeof(Komunikat) - sizeof(long), my_pid, 0) == -1)
+        if (msgrcv(msg_urzad_back_id, &msg, sizeof(Komunikat) - sizeof(long), my_pid, 0) == -1){
+            fprintf(stderr,"%s -- %d -- Wyjebka na msgrcv - Urzednik - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
             break;
-
+        }
         // Jeśli urzędnik zwróci jedną z dwóch wartości odpowiadającyhc za załatwienie sprawy to ustawiamy flagę załatwione na 1 co przerywa pętlę
-        if (msg.typ_sprawy == 0 || msg.typ_sprawy == -1)
+        if (msg.typ_sprawy == 0 || msg.typ_sprawy == LIMIT_OSIAGNIETY)
             zalatwione = 1;
 
         // W przeciwnym razie urzędnik SA nas odesłał do innego urzędnika i musimy powtórzyć proces nadpisując cel(wszystko jest robione na referencji do wiadomości)
@@ -189,8 +218,7 @@ void petent_loop() {
     shm->liczba_petentow_w_budynku -= zajmowane_miejsca;
     sem_v(semid, SEM_MUTEX);
 
-    sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca);
-    sem_v(semid, SEM_PETENCI);
+    sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0);
 
     shmdt(shm);
 }

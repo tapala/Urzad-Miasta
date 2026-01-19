@@ -6,18 +6,35 @@
 
 pid_t kasy[MAX_KASY];
 int liczba_kas = 0;
+int shmid, semid;
+SharedData *shm;
 
 void kasa_loop(){
     int msg_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0);
+    int msg_back_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0);
     Komunikat msg;
 
     while (1) {
-        if (msgrcv(msg_id, &msg, sizeof(Komunikat) - sizeof(long), 1, 0) == -1)
+        if (msgrcv(msg_id, &msg, sizeof(Komunikat) - sizeof(long), 1, 0) == -1){
+            //fprintf(stderr,"%s -- %d -- Wyjebka na msgqueue - %s => %d \n", strerror(errno), getpid(),__FILE__,__LINE__);
             continue;
+        }
         msg.mtype = msg.pid_petenta;
-        msgsnd(msg_id, &msg, sizeof(Komunikat) - sizeof(long), 0);
-    }
+        
+        // Zmniejszenie limitu w SHM
+        sem_p(semid, SEM_MUTEX);
+        if(shm->limity_przyjec[msg.typ_sprawy] > 0)
+            shm->limity_przyjec[msg.typ_sprawy]--;
+        else 
+            msg.typ_sprawy = LIMIT_OSIAGNIETY;
+        sem_v(semid, SEM_MUTEX);
+
+        if(msgsnd(msg_back_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
+            //fprintf(stderr,"%s -- %d -- Wyjebka na msgqueue - %s => %d \n", strerror(errno), getpid(),__FILE__,__LINE__);
+        }
+    };
 }
+
 
 void uruchom_kase(){
     if (liczba_kas >= MAX_KASY)
@@ -25,7 +42,11 @@ void uruchom_kase(){
 
     // Rejestracja robi podział komórkowy i rozkazuje bachorowi dymać na kasie
     pid_t pid = fork();
-    if (pid == 0) {
+    if (pid == -1){
+        perror("Fork error");
+        return;
+    }
+    else if (pid == 0) {
         kasa_loop();
         exit(0);
     }
@@ -43,14 +64,15 @@ void zamknij_kase() {
     pid_t pid = kasy[--liczba_kas];
     kill(pid, SIGTERM);
     waitpid(pid, NULL, 0);
+    printf("Kasa zamknieta \n");
 }
 
 
 int main() {
-    int shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
-    int semid = semget(ftok(FTOK_PATH, ID_SEM), 3, 0);
+    shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
+    semid = semget(ftok(FTOK_PATH, ID_SEM), 4, 0);
 
-    SharedData *shm = shmat(shmid, NULL, 0);
+    shm = (SharedData*)shmat(shmid, NULL, 0);
 
     printf("[REJESTRACJA] System biletowy uruchomiony\n");
 
@@ -88,7 +110,7 @@ int main() {
         while (liczba_kas < docelowe)
             uruchom_kase();
 
-        while (liczba_kas > docelowe)
+        /while (liczba_kas > docelowe)
             zamknij_kase();
 
     }
