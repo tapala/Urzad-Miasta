@@ -15,19 +15,20 @@
 #include <string.h> 
 #include <sys/wait.h>
 
-#define MAX_PETENTOW_W_BUDYNKU 20
-#define PROG_URUCHOMIENIA_KAS 8
-#define CZAS_DO_OTWARCIA 5 //Tp
-#define CZAS_PRACY 20 //Tk-Tp
-#define CZAS_PO_ZAMKNIECIU 120 //Domślnie 2 minuty wedle założeń projektu
-#define MAX_PROCESOW_PETENTOW 1024 //Będzie przydatne do ograniczenia petentów w generatorze
+#define MAX_PETENTOW_W_BUDYNKU 1000
+#define PROG_URUCHOMIENIA_KAS 400
+#define CZAS_DO_OTWARCIA 2 //Tp
+#define CZAS_PRACY 5 //Tk-Tp
+#define CZAS_PO_ZAMKNIECIU 5 //Domślnie 2 minuty wedle założeń projektu
+#define MAX_PROCESOW_PETENTOW 15000 //Będzie przydatne do ograniczenia petentów w generatorze
+#define LIMIT_OSIAGNIETY -1 //Stała do msgqueue dla czytelności 
 
 //Limity wydziałow:
-#define LIMIT_SA 15
-#define LIMIT_SC 8
-#define LIMIT_KM 8
-#define LIMIT_ML 8
-#define LIMIT_PD 8
+#define LIMIT_SA 6000
+#define LIMIT_SC 2000
+#define LIMIT_KM 2000
+#define LIMIT_ML 2000
+#define LIMIT_PD 2000
 #define LIMIT_KASA 99999999
 
 //Identyfikatory wydziałow i kasy - przyda się do obsługi p[etenta]
@@ -42,13 +43,16 @@
 #define FTOK_PATH "."
 #define ID_SHM 10 //Pamięć współdzielona
 #define ID_SEM 11 //Teblica Semaforów
-#define ID_MSG_BILET 12 //Kolejka Komunikatów - Bilety
-#define ID_MSG_URZAD 13 //Kolejka Kpnikatów - Petent <=> Urzędnik
+#define ID_MSG_BILET 12 //Kolejka Komunikatów - Penent(lub SA) => Biletomat
+#define ID_MSG_BILET_BACK 13 //Kolejka Komunikatów - Petent <= Biletomat
+#define ID_MSG_URZAD 14 //Kolejka Kpnikatów - Petent => Urzędnik
+#define ID_MSG_URZAD_BACK 15 //Kolejka Kpnikatów - Petent <= Urzędnik
 
 //Identyfikatory semaforów
 #define SEM_MUTEX 0 // Chroni pamięć dzieloną
 #define SEM_BUDYNEK 1 //Semafor na 'wpuszczanie' petentów do budynku
 #define SEM_PETENCI 2 //Semafor ograniczający istniejących procesów petentów
+#define SEM_MAX_BUDYNEK 3 //Semafor sumy limitów
 
 //Pamięć współdzielona:
 typedef struct { 
@@ -76,5 +80,8 @@ typedef struct {
 void log_to_file(const char *msg); 
 void sem_p(int semid, int sem_num); 
 void sem_v(int semid, int sem_num); 
-void sem_op(int semid, int sem_num, int op);
+void sem_op(int semid, int sem_num, int op, short flag);
+int semt_p(int semid, int sem_num, long nanotime); 
+int semt_v(int semid, int sem_num, long nanotime); 
+int semt_op(int semid, int sem_num, int op, long nanotime);
 #endif
