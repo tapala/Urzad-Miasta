@@ -60,21 +60,6 @@ void start_urzednik(int typ_wydzialu, int limit_dzienny) {
             }
         }
 
-        if (obsluzeni >= limit_dzienny && typ_wydzialu != DEPT_KASA) {
-
-            // Logujemy do pliku przekroczony limit dzienny
-            sprintf(log_buf, "RAPORT: WYDZIAŁ %d odrzucił PID %d (limit wyczerpany)\n", typ_wydzialu, msg.pid_petenta);
-            log_to_file(log_buf);
-            printf("[URZĘDNIK %d] Limit osiągniety - wyjebalem petenta(PID %d)\n", typ_wydzialu, msg.pid_petenta);
-            msg.mtype = msg.pid_petenta;
-            msg.typ_sprawy = LIMIT_OSIAGNIETY;
-
-            if(msgsnd(msg_urzad_back, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
-                fprintf(stderr,"%s - Wyjebka na msgqueue - %d \n", strerror(errno), __LINE__);
-            }
-
-            continue;
-        }
 
 
         // Komunikaty informacyjne
