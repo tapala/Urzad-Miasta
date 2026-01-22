@@ -58,7 +58,6 @@
 
 //Pamięć współdzielona:
 typedef struct { 
-    int liczba_petentow_w_budynku; // Ile osób w budynku 
     int kolejka_do_biletow; // Ilu petentów czeka przy biletomacie 
     int limity_przyjec[7]; //Limity na wydział - liczba jest 7, bo rozpisując schemat na kartce będąc pod ostrym wpływem absyntu zmieszanego ze śliwowicą(na sylwestrze się działo) 'zapomniałem', że tablica leci od 0, a potem tak zostawiłem, bo w sumie śmiesznie  
     int limity_przyjec_sum;
@@ -88,4 +87,5 @@ void sem_op(int semid, int sem_num, int op, short flag);
 int semt_p(int semid, int sem_num, long nanotime); 
 int semt_v(int semid, int sem_num, long nanotime); 
 int semt_op(int semid, int sem_num, int op, long nanotime);
+void gotowanie_procesora(int seconds);
 #endif

@@ -102,23 +102,10 @@ void petent_loop() {
         zajmowane_miejsca = 2;
     }
 
-    sem_p(semid, SEM_MUTEX);
-
-    //XXX
-    if(!shm->limity_przyjec_sum){
-        printf("\033[44m\033[33m[PETENT %d] Brak miejsc u urzedników. Z zalu popelniam sudoku\033[m\n", my_pid);
-        exit(1);
-    }
-
-    sem_v(semid, SEM_MUTEX);
-
     // Opuszczamy semafor budynku i blokujemy pamięć współdzieloną
 
-    sem_op(semid, SEM_BUDYNEK, -zajmowane_miejsca, 0);
+    
     sem_p(semid, SEM_MUTEX);
-
-    //Zwiększamy liczbę petentów w budynku i patrzymy czy nie przekraczamy limitu departamentu oraz wyciągamy flagę pracy urzędu
-    shm->liczba_petentow_w_budynku += zajmowane_miejsca;
     int status = shm->koniec_pracy;
 
     // Odblokowywujemy pamięć współdzieloną
@@ -128,9 +115,7 @@ void petent_loop() {
     //printf("Status: %d; Limit_ok: %d; CEL: %d\n", status, limit_ok, cel);
     //fflush(stdout);
     if (status > 0) {
-        sem_p(semid, SEM_MUTEX);
-        shm->liczba_petentow_w_budynku -= zajmowane_miejsca;
-        sem_v(semid, SEM_MUTEX);
+
 
         sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0);
         shmdt(shm);
@@ -170,6 +155,15 @@ void petent_loop() {
         
         sem_p(semid, SEM_MUTEX);
         shm->kolejka_do_biletow++;
+
+        if(!shm->limity_przyjec_sum){
+            printf("\033[44m\033[33m[PETENT %d] Brak miejsc u urzedników. Z zalu popelniam sudoku\033[m\n", my_pid);
+            fflush(stdout);
+            exit(1);
+        }
+        else{
+            sem_op(semid, SEM_BUDYNEK, -zajmowane_miejsca, 0);
+        }
         sem_v(semid, SEM_MUTEX);
 
         // Komunikat wysyłamy do do biletomatu...
@@ -243,9 +237,6 @@ void petent_loop() {
     }
 
     // Petent obsłużony wychodzi z budynku
-    sem_p(semid, SEM_MUTEX);
-    shm->liczba_petentow_w_budynku -= zajmowane_miejsca;
-    sem_v(semid, SEM_MUTEX);
 
     sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0);
 
@@ -253,10 +244,6 @@ void petent_loop() {
 }
 
 void kys(){
-    sem_p(semid, SEM_MUTEX);
-    shm->liczba_petentow_w_budynku -= zajmowane_miejsca;
-    sem_v(semid, SEM_MUTEX);
-
     sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0);
 
     shmdt(shm);

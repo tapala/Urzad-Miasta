@@ -137,7 +137,7 @@ int main(){
 
     //----------- HARMONOGRAM -------------
 
-    sleep(CZAS_DO_OTWARCIA);
+    gotowanie_procesora(CZAS_DO_OTWARCIA);
 
     printf("[DYREKTOR] Tp — otwieramy drzwi.\n");
     fflush(stdout);
@@ -146,7 +146,7 @@ int main(){
     sem_op(semid, SEM_BUDYNEK, MAX_PETENTOW_W_BUDYNKU, 0);
 
     //Praca do Tk
-    sleep(CZAS_PRACY);
+    gotowanie_procesora(CZAS_PRACY);
 
     printf("[DYREKTOR] Tk — zamykamy, nowi nie wchodzą.\n");
     fflush(stdout);
@@ -155,7 +155,7 @@ int main(){
     shm->koniec_pracy = 1;   //Zamknięcie, ale bez ewakuacji
     sem_v(semid, SEM_MUTEX);
 
-    sleep(CZAS_PO_ZAMKNIECIU);
+    gotowanie_procesora(CZAS_PO_ZAMKNIECIU);
     printf("[DYREKTOR] Ewakuacja logiczna.\n");
     fflush(stdout);
 
@@ -203,11 +203,10 @@ void init_ipc() {
     shm->limity_przyjec[DEPT_KM] = LIMIT_KM;
     shm->limity_przyjec[DEPT_ML] = LIMIT_ML;
     shm->limity_przyjec[DEPT_PD] = LIMIT_PD;
-    shm->limity_przyjec[DEPT_KASA] = LIMIT_KASA; //Dodane w celu testowania - jak się będzie psuć to do wywalenia
+    shm->limity_przyjec[DEPT_KASA] = LIMIT_KASA;                                            //Dodane w celu testowania - jak się będzie psuć to do wywalenia
     shm->limity_przyjec_sum = (LIMIT_KM + LIMIT_ML + LIMIT_PD + LIMIT_SA + LIMIT_SC);
 
     //Zerujemy wartości
-    shm->liczba_petentow_w_budynku = 0;
     shm->kolejka_do_biletow = 0;
     shm->koniec_pracy = 0;
 }

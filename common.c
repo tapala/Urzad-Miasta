@@ -43,3 +43,12 @@ void log_to_file(const char *msg) {
         fclose(f); 
     } 
 }
+
+void gotowanie_procesora(int seconds){
+    time_t start = time(NULL);
+    while(1){
+        time_t now = time(NULL);
+        if((now - start) >= seconds)
+            break;
+    }
+}

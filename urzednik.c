@@ -157,19 +157,3 @@ void start_urzednik(int typ_wydzialu) {
     shmdt(shm);
     
 }
-
-//void setitimer_wrapper(suseconds_t a){
-//    struct itimerval unga_bunga = {
-//        .it_value = {
-//            .tv_sec = 0,
-//            .tv_usec = a
-//        },
-//        .it_interval = {
-//            .tv_sec = 0,
-//            .tv_usec = 0
-//        },
-//    };
-//    if(setitimer(ITIMER_REAL, &unga_bunga, NULL) == -1){
-//        perror("Wyjebka na timerze");
-//    }
-//}
