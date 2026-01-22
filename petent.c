@@ -69,11 +69,6 @@ void* opiekun_thread(void *arg)
         exit(1);
     }
 
-    // wyjście z kolejki biletowej
-    sem_p(semid, SEM_MUTEX);
-    shm->kolejka_do_biletow--;
-    sem_v(semid, SEM_MUTEX);
-
     // Informacja dla dziecka - wręczenie biletu
     pthread_mutex_lock(&mtx);
     bilet_gotowy = 1;
@@ -149,19 +144,23 @@ void petent_loop() {
         pthread_mutex_unlock(&mtx);
 
         pthread_join(th, NULL);
+        sem_p(semid, SEM_MUTEX);
+        shm->kolejka_do_biletow--;
+        sem_v(semid, SEM_MUTEX);
     }
     // Dorosły działa jak wcześniej
     else {
         
         sem_p(semid, SEM_MUTEX);
-        shm->kolejka_do_biletow++;
 
         if(!shm->limity_przyjec_sum){
+            sem_v(semid, SEM_MUTEX);
             printf("\033[44m\033[33m[PETENT %d] Brak miejsc u urzedników. Z zalu popelniam sudoku\033[m\n", my_pid);
             fflush(stdout);
             exit(1);
         }
         else{
+            shm->kolejka_do_biletow++;
             sem_op(semid, SEM_BUDYNEK, -zajmowane_miejsca, 0);
         }
         sem_v(semid, SEM_MUTEX);
@@ -179,6 +178,9 @@ void petent_loop() {
         }
 
         if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
+            sem_p(semid, SEM_MUTEX);
+            shm->kolejka_do_biletow--;
+            sem_v(semid, SEM_MUTEX);
             printf("\033[41m[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku\033[m\n", my_pid, cel);
             fflush(stdout);
             sprintf(log_buf, "[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku \n", my_pid, cel);
@@ -186,11 +188,12 @@ void petent_loop() {
             exit(1);
         }
 
-        // ...a na koniec zmniejszamy piczbę petentów w kolejce o 1
-        sem_p(semid, SEM_MUTEX);
-        shm->kolejka_do_biletow--;
-        sem_v(semid, SEM_MUTEX);
     }
+
+        // ...a na koniec zmniejszamy piczbę petentów w kolejce o 1
+    sem_p(semid, SEM_MUTEX);
+    shm->kolejka_do_biletow--;
+    sem_v(semid, SEM_MUTEX);
 
     while (1) {
 
