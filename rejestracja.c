@@ -17,14 +17,15 @@ void kasa_loop(){
     while (1) {
         if (msgrcv(msg_id, &msg, sizeof(Komunikat) - sizeof(long), 1, 0) == -1){
             //fprintf(stderr,"%s -- %d -- Wyjebka na msgqueue - %s => %d \n", strerror(errno), getpid(),__FILE__,__LINE__);
-            continue;
         }
         msg.mtype = msg.pid_petenta;
         
         // Zmniejszenie limitu w SHM
         sem_p(semid, SEM_MUTEX);
-        if(shm->limity_przyjec[msg.typ_sprawy] > 0)
+        if(shm->limity_przyjec[msg.typ_sprawy] > 0){
+            shm->limity_przyjec_sum--;
             shm->limity_przyjec[msg.typ_sprawy]--;
+        }
         else 
             msg.typ_sprawy = LIMIT_OSIAGNIETY;
         sem_v(semid, SEM_MUTEX);
@@ -42,6 +43,8 @@ void uruchom_kase(){
 
     // Rejestracja robi podział komórkowy i rozkazuje bachorowi dymać na kasie
     pid_t pid = fork();
+    //printf("OTWIERAM KASE \n");
+    //fflush(stdout);
     if (pid == -1){
         perror("Fork error");
         return;
@@ -64,7 +67,8 @@ void zamknij_kase() {
     pid_t pid = kasy[--liczba_kas];
     kill(pid, SIGTERM);
     waitpid(pid, NULL, 0);
-    printf("Kasa zamknieta \n");
+    //printf("Kasa zamknieta \n");
+    //fflush(stdout);
 }
 
 

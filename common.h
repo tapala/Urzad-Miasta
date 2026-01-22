@@ -8,57 +8,60 @@
 #include <sys/ipc.h> 
 #include <sys/shm.h> 
 #include <sys/sem.h> 
-#include <sys/msg.h> 
+#include <sys/msg.h>
+#include <sys/time.h> 
 #include <signal.h> 
 #include <errno.h> 
 #include <time.h> 
 #include <string.h> 
 #include <sys/wait.h>
 
-#define MAX_PETENTOW_W_BUDYNKU 1000
-#define PROG_URUCHOMIENIA_KAS 400
-#define CZAS_DO_OTWARCIA 2 //Tp
-#define CZAS_PRACY 5 //Tk-Tp
-#define CZAS_PO_ZAMKNIECIU 5 //Domślnie 2 minuty wedle założeń projektu
-#define MAX_PROCESOW_PETENTOW 15000 //Będzie przydatne do ograniczenia petentów w generatorze
-#define LIMIT_OSIAGNIETY -1 //Stała do msgqueue dla czytelności 
+#define MAX_PETENTOW_W_BUDYNKU (2000)
+#define PROG_URUCHOMIENIA_KAS (350)
+#define CZAS_DO_OTWARCIA (2) //Tp
+#define CZAS_PRACY (30) //Tk-Tp
+#define CZAS_PO_ZAMKNIECIU (5) //Domślnie 2 minuty wedle założeń projektu
+#define MAX_PROCESOW_PETENTOW (15000) //Będzie przydatne do ograniczenia petentów w generatorze
+#define LIMIT_OSIAGNIETY (-1) //Stała do msgqueue dla czytelności 
+#define POWROT_Z_KASY (-2) //Stała do msgqueue
 
 //Limity wydziałow:
-#define LIMIT_SA 6000
-#define LIMIT_SC 2000
-#define LIMIT_KM 2000
-#define LIMIT_ML 2000
-#define LIMIT_PD 2000
-#define LIMIT_KASA 99999999
+#define LIMIT_SA (6000)
+#define LIMIT_SC (1000)
+#define LIMIT_KM (1000)
+#define LIMIT_ML (1000)
+#define LIMIT_PD (1000)
+#define LIMIT_KASA (999999999)
 
 //Identyfikatory wydziałow i kasy - przyda się do obsługi p[etenta]
-#define DEPT_SA 1
-#define DEPT_SC 2
-#define DEPT_KM 3
-#define DEPT_ML 4
-#define DEPT_PD 5
-#define DEPT_KASA 6
+#define DEPT_SA (1)
+#define DEPT_SC (2)
+#define DEPT_KM (3)
+#define DEPT_ML (4)
+#define DEPT_PD (5)
+#define DEPT_KASA (6)
 
 //Klucze IPC wraz z generatrem
 #define FTOK_PATH "."
-#define ID_SHM 10 //Pamięć współdzielona
-#define ID_SEM 11 //Teblica Semaforów
-#define ID_MSG_BILET 12 //Kolejka Komunikatów - Penent(lub SA) => Biletomat
-#define ID_MSG_BILET_BACK 13 //Kolejka Komunikatów - Petent <= Biletomat
-#define ID_MSG_URZAD 14 //Kolejka Kpnikatów - Petent => Urzędnik
-#define ID_MSG_URZAD_BACK 15 //Kolejka Kpnikatów - Petent <= Urzędnik
+#define ID_SHM (10) //Pamięć współdzielona
+#define ID_SEM (11) //Teblica Semaforów
+#define ID_MSG_BILET (12) //Kolejka Komunikatów - Penent(lub SA) => Biletomat
+#define ID_MSG_BILET_BACK (13) //Kolejka Komunikatów - Petent <= Biletomat
+#define ID_MSG_URZAD (14) //Kolejka Kpnikatów - Petent => Urzędnik
+#define ID_MSG_URZAD_BACK 9 //Kolejka Kpnikatów - Petent <= Urzędnik
 
 //Identyfikatory semaforów
-#define SEM_MUTEX 0 // Chroni pamięć dzieloną
-#define SEM_BUDYNEK 1 //Semafor na 'wpuszczanie' petentów do budynku
-#define SEM_PETENCI 2 //Semafor ograniczający istniejących procesów petentów
-#define SEM_MAX_BUDYNEK 3 //Semafor sumy limitów
+#define SEM_MUTEX (0) // Chroni pamięć dzieloną
+#define SEM_BUDYNEK (1) //Semafor na 'wpuszczanie' petentów do budynku
+#define SEM_PETENCI (2) //Semafor ograniczający istniejących procesów petentów
+#define SEM_LOG_MUTEX (3)
 
 //Pamięć współdzielona:
 typedef struct { 
     int liczba_petentow_w_budynku; // Ile osób w budynku 
     int kolejka_do_biletow; // Ilu petentów czeka przy biletomacie 
     int limity_przyjec[7]; //Limity na wydział - liczba jest 7, bo rozpisując schemat na kartce będąc pod ostrym wpływem absyntu zmieszanego ze śliwowicą(na sylwestrze się działo) 'zapomniałem', że tablica leci od 0, a potem tak zostawiłem, bo w sumie śmiesznie  
+    int limity_przyjec_sum;
     int koniec_pracy; // 0 - Zakład pracuje, 1 - Zamknięcie(po CZAS_PRACY), 2 - Ewakuacja 
     int liczba_aktywnych_biletomatow; 
 } SharedData;
@@ -71,7 +74,8 @@ typedef struct {
     int typ_sprawy; // Cel wizyty 
     int jest_vip; // Binarka 
     int odeslany_z_sa; // Flaga przekierowania - żeby się nie zapętlało
-
+    int cel_po_kasie; // Jeśli wraca z kasy to musi wiedzieć do kogo wrócić
+    int kasa_odwiedzona; // Flaga informująca, że petent był już w kasie
     int wiek; // Wiek petenta 
     int wiek_opiekuna; // >25 jeśli petent <18, wedle tych przeklętych wymagań
 } Komunikat;

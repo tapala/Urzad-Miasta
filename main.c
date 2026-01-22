@@ -1,7 +1,7 @@
 #include "common.h"
 
 
-int shmid, semid, msg_bilet_id, msg_bilet_back_id, msg_urzad_id, msg_urzad_back_id;
+int shmid, semid, msg_bilet_id, msg_bilet_back_id, msg_urzad_id, msg_urzad_back_id, generator_stop_flag;
 SharedData *shm;
 pid_t generator_pid;
 
@@ -14,6 +14,7 @@ int main(){
 
     signal(SIGINT, signal_handler);
     //srand(time(NULL));
+    generator_stop_flag = 0;
     init_ipc();
 
     printf("[DYREKTOR] System startuje. Czekamy na Tp - drzwi zamknięte.\n");
@@ -74,13 +75,14 @@ int main(){
     generator_pid = fork();                                             //Forkujemy mmaina         
     if (!generator_pid) {                                           //Jeśli dzieciak to dajemy mu przywilej bycia generatorem, aż do śmierci 
         signal(SIGCHLD, signal_handler);
+        signal(SIGTERM, signal_handler);
         while (1) {                                                     //Generator pracuje do zamknięcia urzędu
             //Generator pracuje do zamknięcia urzędu
             sem_p(semid, SEM_MUTEX);
             int status = shm->koniec_pracy;
             sem_v(semid, SEM_MUTEX);
 
-            if (status == 1 || status == 2) break;
+            if (status == 1 || status == 2 || generator_stop_flag) break;
             //while (waitpid(-1, NULL, WNOHANG) > 0) {}
 
             // Opuszczamy semafor naszego bufora petentów w celu zapobiegnięcia nadmiernego wykożystania procesora
@@ -137,7 +139,7 @@ int main(){
 
     sleep(CZAS_DO_OTWARCIA);
 
-    printf("[DYREKTOR] Tp — otwieramy drzwi.");
+    printf("[DYREKTOR] Tp — otwieramy drzwi.\n");
     fflush(stdout);
 
     //Wpuszczamy N osób na semaforze budynku
@@ -154,8 +156,6 @@ int main(){
     sem_v(semid, SEM_MUTEX);
 
     sleep(CZAS_PO_ZAMKNIECIU);
-    printf("[DYREKTOR] Frustracja po podanym czasie\n");
-    fflush(stdout);
     printf("[DYREKTOR] Ewakuacja logiczna.\n");
     fflush(stdout);
 
@@ -167,7 +167,7 @@ int main(){
     cleanup();
 
     //Czekam na dziecki
-    //while (wait(NULL) > 0); 
+    while (wait(NULL) > 0); 
 
     return 0;
 }
@@ -184,10 +184,10 @@ void init_ipc() {
     
     //Utworzenie tablicy 3 semaforów i przypisanie im wstępnych wartości
     semid = semget(ftok(FTOK_PATH, ID_SEM), 4, 0600 | IPC_CREAT);
-    semctl(semid, SEM_MUTEX, SETVAL, 1);                        //Nasz Mutexik
-    semctl(semid, SEM_BUDYNEK, SETVAL, 0);                      //Wpuszczanie do budynku
-    semctl(semid, SEM_PETENCI, SETVAL, MAX_PROCESOW_PETENTOW);  //Ogranicznik petentów
-    semctl(semid, SEM_MAX_BUDYNEK, SETVAL, (LIMIT_KM + LIMIT_ML + LIMIT_PD + LIMIT_SA + LIMIT_SC));
+    semctl(semid, SEM_MUTEX, SETVAL, 1);                                                            //Nasz Mutexik
+    semctl(semid, SEM_BUDYNEK, SETVAL, 0);                                                          //Wpuszczanie do budynku
+    semctl(semid, SEM_PETENCI, SETVAL, MAX_PROCESOW_PETENTOW);                                      //Ogranicznik petentów
+    semctl(semid, SEM_LOG_MUTEX, SETVAL, 1);                                                        //Muteks Logi
 
     //Utworzenie kolejek komunikatów
     msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0600 | IPC_CREAT);
@@ -204,6 +204,7 @@ void init_ipc() {
     shm->limity_przyjec[DEPT_ML] = LIMIT_ML;
     shm->limity_przyjec[DEPT_PD] = LIMIT_PD;
     shm->limity_przyjec[DEPT_KASA] = LIMIT_KASA; //Dodane w celu testowania - jak się będzie psuć to do wywalenia
+    shm->limity_przyjec_sum = (LIMIT_KM + LIMIT_ML + LIMIT_PD + LIMIT_SA + LIMIT_SC);
 
     //Zerujemy wartości
     shm->liczba_petentow_w_budynku = 0;
@@ -219,7 +220,7 @@ void run_urzednik(int dept, int limit) {
     snprintf(dept_str, sizeof(dept_str), "%d", dept);
     snprintf(limit_str, sizeof(limit_str), "%d", limit);
 
-    execl("./urzednik", "urzednik", dept_str, limit_str, NULL);
+    execl("./urzednik", "urzednik", dept_str, NULL);
 
     perror("execl urzednik");
     exit(1);
@@ -235,6 +236,7 @@ void cleanup() {
     shmctl(shmid, IPC_RMID, NULL);              //Usunięcie segmentu pamięci współ.
     semctl(semid, 0, IPC_RMID);                 //Usunięcie semaforów
     msgctl(msg_bilet_id, IPC_RMID, NULL);
+    msgctl(msg_bilet_back_id, IPC_RMID, NULL);
 
     //Usuwanie kolejek komunikatów
     msgctl(msg_urzad_id, IPC_RMID, NULL);
@@ -242,7 +244,7 @@ void cleanup() {
 
     // zabij generator jeśli jeszcze działa
     if (generator_pid > 0)
-        kill(generator_pid, SIGKILL);
+        kill(generator_pid, SIGTERM);
 
     // czekamy na wszystkie dzieciaczki
     while (wait(NULL) > 0);
@@ -253,10 +255,15 @@ void cleanup() {
 void signal_handler(int sig) {
     if (sig == SIGINT) {
         printf("\n[DYREKTOR] SIGINT -> ewakuacja.\n");
+        sem_p(semid, SEM_MUTEX);
         if (shm)
             shm->koniec_pracy = 2;
+        sem_v(semid, SEM_MUTEX);
     }
     else if (sig == SIGCHLD){
         wait(NULL);
+    }
+    else if (sig == SIGTERM){
+        generator_stop_flag = 1;
     }
 }

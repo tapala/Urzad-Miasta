@@ -7,12 +7,15 @@ pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 atomic_int bilet_gotowy = 0;
 int shmid, semid,  msg_bilet_id, msg_bilet_back_id, msg_urzad_id, msg_urzad_back_id, cel;
+int zajmowane_miejsca = 1;
 pid_t my_pid;
+char log_buf[256];
 
 SharedData *shm;
 
 Komunikat msg;
 
+void kys();
 void petent_loop();
 void* opiekun_thread(void *arg);
 
@@ -50,16 +53,19 @@ void* opiekun_thread(void *arg)
 
     // Wysłanie żądania biletu
     if(msgsnd(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
-        fprintf(stderr,"%s - Wyjebka na msgsnd - Kasa - %s => %d \n", strerror(errno), __FILE__,__LINE__);
+        fprintf(stderr,"%s - Wyjebka na msgsnd - Rejestracja - %s => %d \n", strerror(errno), __FILE__,__LINE__);
     }
 
     // Odebranie biletu adresowanego do PID petenta
     if(msgrcv(msg_bilet_back_id, &msg, sizeof(Komunikat) - sizeof(long), msg.pid_petenta, 0) == -1){
-        fprintf(stderr,"%s - Wyjebka na msgrcv - Kasa - %s => %d \n", strerror(errno), __FILE__,__LINE__);
+        fprintf(stderr,"%s - Wyjebka na msgrcv - Rejestracja - %s => %d \n", strerror(errno), __FILE__,__LINE__);
     }
 
     if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
-        printf("[PETENT %d] Brak miejsc u urzednika %d. Z zalupopelniam sudoku \n", my_pid, cel);
+        printf("\033[41m[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku\033[m\n", my_pid, cel);
+        fflush(stdout);
+        sprintf(log_buf, "[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku \n", my_pid, cel);
+        log_to_file(log_buf);
         exit(1);
     }
 
@@ -90,12 +96,21 @@ void petent_loop() {
     // Obsługa wieku
     int wiek = (rand() % 90) + 1;               // Losujemy Wiek
     int wiek_opiekuna = 0;
-    int zajmowane_miejsca = 1;
 
     if (wiek < 18) {                            // Jeśli dziecko to losujemy wiek opiekuna i ustawiamy zajmowane miejsce na 2
         wiek_opiekuna = (rand() % 60) + 18;
         zajmowane_miejsca = 2;
     }
+
+    sem_p(semid, SEM_MUTEX);
+
+    //XXX
+    if(!shm->limity_przyjec_sum){
+        printf("\033[44m\033[33m[PETENT %d] Brak miejsc u urzedników. Z zalu popelniam sudoku\033[m\n", my_pid);
+        exit(1);
+    }
+
+    sem_v(semid, SEM_MUTEX);
 
     // Opuszczamy semafor budynku i blokujemy pamięć współdzieloną
 
@@ -104,7 +119,6 @@ void petent_loop() {
 
     //Zwiększamy liczbę petentów w budynku i patrzymy czy nie przekraczamy limitu departamentu oraz wyciągamy flagę pracy urzędu
     shm->liczba_petentow_w_budynku += zajmowane_miejsca;
-    int limit_ok = shm->limity_przyjec[cel] > 0;
     int status = shm->koniec_pracy;
 
     // Odblokowywujemy pamięć współdzieloną
@@ -113,7 +127,7 @@ void petent_loop() {
     // Jeśli urząd przestał pracować lub limit został przekroczony petent wychodzi z budynku i kończy swój proces
     //printf("Status: %d; Limit_ok: %d; CEL: %d\n", status, limit_ok, cel);
     //fflush(stdout);
-    if (status > 0 || !limit_ok) {
+    if (status > 0) {
         sem_p(semid, SEM_MUTEX);
         shm->liczba_petentow_w_budynku -= zajmowane_miejsca;
         sem_v(semid, SEM_MUTEX);
@@ -129,6 +143,8 @@ void petent_loop() {
     msg.jest_vip = vip;
     msg.wiek = wiek;
     msg.wiek_opiekuna = wiek_opiekuna;
+    msg.cel_po_kasie = 0;
+    msg.kasa_odwiedzona = 0;
     msg.odeslany_z_sa = 0;
 
     //printf("[PETENT %d] Utworzono petenta : %d, %d, %d", my_pid, wiek, wiek_opiekuna, vip);
@@ -158,16 +174,21 @@ void petent_loop() {
 
         // Komunikat wysyłamy do do biletomatu...
         if(msgsnd(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
-            fprintf(stderr,"%s -- %d -- Wyjebka na msgsend - Kasa - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+            fprintf(stderr,"%s -- %d -- Wyjebka na msgsend - Rejestracja - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+            kys();
         }
 
         // ...po czym pobieramy komunikat zwrotny...
         if(msgrcv(msg_bilet_back_id, &msg, sizeof(Komunikat) - sizeof(long), my_pid, 0) == -1){
-            fprintf(stderr,"%s -- %d -- Wyjebka na msgrcv - Kasa - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+            fprintf(stderr,"%s -- %d -- Wyjebka na msgrcv - Rejestracja - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+            kys();
         }
 
         if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
-            printf("[PETENT %d] Brak miejsc u urzednika %d. Z zalupopelniam sudoku \n", my_pid, cel);
+            printf("\033[41m[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku\033[m\n", my_pid, cel);
+            fflush(stdout);
+            sprintf(log_buf, "[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku \n", my_pid, cel);
+            log_to_file(log_buf);
             exit(1);
         }
 
@@ -177,8 +198,7 @@ void petent_loop() {
         sem_v(semid, SEM_MUTEX);
     }
 
-    int zalatwione = 0;
-    while (!zalatwione) {
+    while (1) {
 
         sem_p(semid, SEM_MUTEX);
         int status = shm->koniec_pracy;
@@ -187,16 +207,21 @@ void petent_loop() {
         if (status == 2) break;
 
         // Wysyłamy petenta do odpowiedniego urzędasa
-        if (vip) {
-            msg.mtype = cel * 10 + 1;   // Kolejka VIP
-        } else {
-            msg.mtype = cel * 10 + 2;   // Zwykła kolejka
+        if(msg.kasa_odwiedzona){
+            msg.mtype = cel * 10 + 1;   // Kolejka po powrocie z kasy
+        }
+        else if (vip) {
+            msg.mtype = cel * 10 + 2;   // Kolejka VIP
+        } 
+        else {
+            msg.mtype = cel * 10 + 3;   // Zwykła kolejka
         }
 
         msg.typ_sprawy = cel;
 
         if(msgsnd(msg_urzad_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
             fprintf(stderr,"%s -- %d -- Wyjebka na msgsend - Urzednik - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+            kys();
         }
 
         // Jeśli komunikat się nie powiedzie to przerywamy pętlę
@@ -204,10 +229,14 @@ void petent_loop() {
             fprintf(stderr,"%s -- %d -- Wyjebka na msgrcv - Urzednik - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
             break;
         }
-        // Jeśli urzędnik zwróci jedną z dwóch wartości odpowiadającyhc za załatwienie sprawy to ustawiamy flagę załatwione na 1 co przerywa pętlę
-        if (msg.typ_sprawy == 0 || msg.typ_sprawy == LIMIT_OSIAGNIETY)
-            zalatwione = 1;
+        // Jeśli urzędnik zwróci wartość odpowiadającą załatwienie sprawy to przerywamy pętlę
+        if (msg.typ_sprawy == 0)
+            break;
 
+        else if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
+            printf("\033[41m\033[30m[PETENT %d] SA nie mogło mnie przekierowac. Pora umierać      \033[m\n", my_pid);
+            break;
+        }
         // W przeciwnym razie urzędnik SA nas odesłał do innego urzędnika i musimy powtórzyć proces nadpisując cel(wszystko jest robione na referencji do wiadomości)
         else
             cel = msg.typ_sprawy;
@@ -221,4 +250,15 @@ void petent_loop() {
     sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0);
 
     shmdt(shm);
+}
+
+void kys(){
+    sem_p(semid, SEM_MUTEX);
+    shm->liczba_petentow_w_budynku -= zajmowane_miejsca;
+    sem_v(semid, SEM_MUTEX);
+
+    sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0);
+
+    shmdt(shm);
+    exit(1);
 }
