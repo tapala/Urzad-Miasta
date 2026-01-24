@@ -2,17 +2,20 @@
 
 void start_urzednik();
 void signal_handler(int a);
+void director_shutdown(int a);
 void setitimer_wrapper(suseconds_t a);
 void queue_cleanup();
 
 int typ_wydzialu, shmid, semid, msg_urzad, msg_urzad_back;
 int close_flag = 0;
+int force_close_flag = 0;
 int sa_zamkiete = 0;
 
 SharedData *shm;
 Komunikat msg;
 int main(int argc, char **argv) {
     signal(SIGALRM,signal_handler);
+    signal(SIGUSR1,director_shutdown);
     typ_wydzialu = atoi(argv[1]);
     shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600);
     semid = semget(ftok(FTOK_PATH, ID_SEM), 4, 0600);
@@ -179,7 +182,7 @@ void start_urzednik() {
     
 }
 
-void director_shutdown(){
+void director_shutdown(int a){
     if (typ_wydzialu == DEPT_SA){
         sa_zamkiete = shm->sa_zamkiete;
         sem_p(semid, SEM_MUTEX);
@@ -200,6 +203,7 @@ void director_shutdown(){
         sem_v(semid, SEM_MUTEX);
         close_flag = 1;
     }
+    force_close_flag = 1;
 }
 
 void empty_msgqueue(long type){
@@ -236,5 +240,5 @@ void queue_cleanup(){
         sem_p(semid, SEM_MUTEX);
         cleanup_flag = shm->brak_petentow;
         sem_v(semid, SEM_MUTEX);
-    }while(!cleanup_flag);
+    }while(!cleanup_flag /*&& !force_close_flag*/);
 }

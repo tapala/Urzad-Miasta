@@ -211,7 +211,7 @@ void petent_loop() {
 
         msg.typ_sprawy = cel;
         
-        
+
         if(msgsnd(msg_urzad_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
             fprintf(stderr,"%s -- %d -- Wyjebka na msgsend - Urzednik - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
             kys();
@@ -232,6 +232,7 @@ void petent_loop() {
         }
         else if(msg.typ_sprawy == KONIEC_OBSLUGI){
             printf("\033[46m\033[34m[PETENT %d] Chcę rozmawiać z menadżerem                       \033[m\n", my_pid);
+            fflush(stdout);
             break;
         }
         // W przeciwnym razie urzędnik SA nas odesłał do innego urzędnika i musimy powtórzyć proces nadpisując cel(wszystko jest robione na referencji do wiadomości)
