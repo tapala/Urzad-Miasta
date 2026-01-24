@@ -47,18 +47,8 @@ void* opiekun_thread(void *arg)
 {
     (void)arg;
     // Wejście do kolejki biletowej
-    
     sem_p(semid, SEM_MUTEX);
-    if(!shm->limity_przyjec_sum){
-        sem_v(semid, SEM_MUTEX);
-        printf("\033[44m\033[33m[PETENT %d] Brak miejsc u urzedników. Z zalu popelniam sudoku\033[m\n", my_pid);
-        fflush(stdout);
-        exit(1);
-    }
-    else{
-        shm->kolejka_do_biletow++;
-        sem_op(semid, SEM_BUDYNEK, -zajmowane_miejsca, 0);
-    }
+    shm->kolejka_do_biletow++;
     sem_v(semid, SEM_MUTEX);
 
     // Wysłanie żądania biletu
@@ -137,7 +127,14 @@ void petent_loop() {
     msg.kasa_odwiedzona = 0;
     msg.odeslany_z_sa = 0;
 
-    //printf("[PETENT %d] Utworzono petenta : %d, %d, %d", my_pid, wiek, wiek_opiekuna, vip);
+    sem_p(semid, SEM_MUTEX);
+    if(!shm->limity_przyjec_sum){
+        sem_v(semid, SEM_MUTEX);
+        printf("\033[44m\033[33m[PETENT %d] Brak miejsc u urzedników. Z zalu popelniam sudoku\033[m\n", my_pid);
+        fflush(stdout);
+        exit(1);
+    }
+    sem_v(semid, SEM_MUTEX);
 
     // Jeśli dziecko -> odpal wątek opiekuna
     if (wiek < 18) {
@@ -159,17 +156,7 @@ void petent_loop() {
     else {
         
         sem_p(semid, SEM_MUTEX);
-
-        if(!shm->limity_przyjec_sum){
-            sem_v(semid, SEM_MUTEX);
-            printf("\033[44m\033[33m[PETENT %d] Brak miejsc u urzedników. Z zalu popelniam sudoku\033[m\n", my_pid);
-            fflush(stdout);
-            exit(1);
-        }
-        else{
-            shm->kolejka_do_biletow++;
-            sem_op(semid, SEM_BUDYNEK, -zajmowane_miejsca, 0);
-        }
+        shm->kolejka_do_biletow++;
         sem_v(semid, SEM_MUTEX);
 
         // Komunikat wysyłamy do do biletomatu...

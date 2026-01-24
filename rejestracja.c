@@ -89,7 +89,7 @@ int main() {
         sem_v(semid, SEM_MUTEX);
 
         // Ewakuacja
-        if (status == 2) {
+        if (status == 1 || status == 2) {
             break;
         }
 

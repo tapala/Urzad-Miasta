@@ -258,6 +258,8 @@ void signal_handler(int sig) {
         if (shm)
             shm->koniec_pracy = 2;
         sem_v(semid, SEM_MUTEX);
+        while (wait(NULL) > 0);
+        exit(1);
     }
     else if (sig == SIGCHLD){
         wait(NULL);
