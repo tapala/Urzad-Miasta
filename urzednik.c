@@ -1,48 +1,63 @@
 #include "common.h"
 
-void start_urzednik(int typ_wydzialu);
+void start_urzednik();
 void signal_handler(int a);
 void setitimer_wrapper(suseconds_t a);
+void queue_cleanup();
 
+int typ_wydzialu, shmid, semid, msg_urzad, msg_urzad_back;
+int close_flag = 0;
+int sa_zamkiete = 0;
+
+SharedData *shm;
+Komunikat msg;
 int main(int argc, char **argv) {
     signal(SIGALRM,signal_handler);
-    int typ_wydzialu = atoi(argv[1]);
-    start_urzednik(typ_wydzialu);
+    typ_wydzialu = atoi(argv[1]);
+    shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600);
+    semid = semget(ftok(FTOK_PATH, ID_SEM), 4, 0600);
+    msg_urzad = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0600);
+    msg_urzad_back = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_BACK), 0600);
+    shm = (SharedData*)shmat(shmid, NULL, 0);
+    start_urzednik();
 }
 
 void signal_handler(int a){
 
 }
 
-void start_urzednik(int typ_wydzialu) {
+void start_urzednik() {
 
     // Inicjalizacja pamięci, semaforów, kolejki komunikatów
-    int shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600);
-    SharedData *shm = (SharedData*)shmat(shmid, NULL, 0);
-
-    int semid = semget(ftok(FTOK_PATH, ID_SEM), 4, 0600);
     int msg_bilet = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0600);
     int msg_bilet_back = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0600);
-    int msg_urzad = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0600);
-    int msg_urzad_back = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_BACK), 0600);
 
     // Podstawowy syf
     int obsluzeni = 0;
-    Komunikat msg;
     char log_buf[256];
 
     printf("[URZĘDNIK %d] Rozpoczyna pracę.\n", typ_wydzialu);
 
-    while (1)
+    while (!close_flag)
     {
+        usleep(1000000);
         // Sprawdzanie stanu pracy urzędu
         sem_p(semid, SEM_MUTEX);
         int stan = shm->koniec_pracy;
         sem_v(semid, SEM_MUTEX);
 
         // Ewakuacja natychmiastowa
-        if (stan == 2)
-            break;   
+        if (stan == 1 || stan == 2){
+            sem_p(semid, SEM_MUTEX);
+            if (!(shm->sa_zamkiete)){
+                shm->sa_zamkiete = 1;
+            }
+            else{
+                sa_zamkiete = 1;
+            }
+            sem_v(semid, SEM_MUTEX);
+            break;
+        }   
 
         //  PRIORYTET VIP w kolejce do urzędnika
         long kasa_type = typ_wydzialu * 10 + 1;
@@ -61,11 +76,11 @@ void start_urzednik(int typ_wydzialu) {
                 alarm(0);
                 if (rc == -1)
                 {
-                    if (errno == ENOMSG && stan == 1)
-                        break; // Koniec dnia + pusta kolejka
-                    else if(errno != ENOMSG && errno != EINTR){
+                    if(errno != ENOMSG && errno != EINTR){
                         perror("Wyjebka message queue");
                     }
+                    else if (stan == 1 || stan == 2)
+                        break; // Koniec dnia + pusta kolejka
                     continue;  // Nic do roboty więc czeka dalej
                 }
             }
@@ -129,8 +144,9 @@ void start_urzednik(int typ_wydzialu) {
                     log_to_file(log_buf);
                 }
                 else{
-                    sprintf(log_buf, "[URZĘDNIK %d] Przekierowano petenta %d do %d\n", typ_wydzialu, msg.pid_petenta, cel);
-                    log_to_file(log_buf);
+                    printf(log_buf, "[URZĘDNIK %d] Przekierowano petenta %d do %d\n", typ_wydzialu, msg.pid_petenta, cel);
+                    //log_to_file(log_buf);
+                    fflush(stdout);
                 }
             }
             
@@ -152,8 +168,73 @@ void start_urzednik(int typ_wydzialu) {
             fprintf(stderr,"%s - Wyjebka na msgqueue - %d \n", strerror(errno), __LINE__);
         }
     }
+
+    if(typ_wydzialu != DEPT_SA || sa_zamkiete){
+        queue_cleanup();
+    }
+
     printf("\033[33m[URZEDNIK %d] Koniec - obsluzeni: %d\033[m\n",typ_wydzialu, obsluzeni);
     // Odłączenie pamięci współdzielonej po zakończeniu loopa - ewakuacja
     shmdt(shm);
     
+}
+
+void director_shutdown(){
+    if (typ_wydzialu == DEPT_SA){
+        sa_zamkiete = shm->sa_zamkiete;
+        sem_p(semid, SEM_MUTEX);
+        if(sa_zamkiete){
+            shm->limity_przyjec_sum -= shm->limity_przyjec[typ_wydzialu];
+            shm->limity_przyjec[typ_wydzialu] = 0;
+        }
+        else{
+            shm->sa_zamkiete = 1;
+        }
+        sem_v(semid, SEM_MUTEX);
+        close_flag = 1;
+    }
+    else{
+        sem_p(semid, SEM_MUTEX);
+        shm->limity_przyjec_sum -= shm->limity_przyjec[typ_wydzialu];
+        shm->limity_przyjec[typ_wydzialu] = 0;
+        sem_v(semid, SEM_MUTEX);
+        close_flag = 1;
+    }
+}
+
+void empty_msgqueue(long type){
+    while(1){
+        if (msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), type, IPC_NOWAIT) == -1){
+            if (errno == ENOMSG) {
+                break;
+            } 
+            else {
+                fprintf(stderr,"%s - Wyjebka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
+                return;
+            }
+        }
+        else{
+            msg.mtype = msg.pid_petenta;
+            msg.typ_sprawy = KONIEC_OBSLUGI;
+            if(msgsnd(msg_urzad_back, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
+                fprintf(stderr,"%s - Wyjebka na msgsnd przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
+                return;
+            } 
+        }
+    }
+}
+
+void queue_cleanup(){
+    long kasa_type = typ_wydzialu * 10 + 1;
+    long vip_type = typ_wydzialu * 10 + 2;
+    long normal_type = typ_wydzialu * 10 + 3;
+    int cleanup_flag;
+    do{
+        empty_msgqueue(kasa_type);
+        empty_msgqueue(vip_type);
+        empty_msgqueue(normal_type);
+        sem_p(semid, SEM_MUTEX);
+        cleanup_flag = shm->brak_petentow;
+        sem_v(semid, SEM_MUTEX);
+    }while(!cleanup_flag);
 }

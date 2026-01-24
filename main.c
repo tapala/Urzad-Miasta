@@ -131,6 +131,9 @@ int main(){
             //usleep((rand() % 400 + 100) * 10);
         }
         while(wait(NULL)>0);
+        sem_p(semid, SEM_MUTEX);
+        shm->brak_petentow = 1;
+        sem_v(semid, SEM_MUTEX);
         exit(0);
     }
 
@@ -155,13 +158,15 @@ int main(){
     shm->koniec_pracy = 1;   //Zamknięcie, ale bez ewakuacji
     sem_v(semid, SEM_MUTEX);
 
-    gotowanie_procesora(CZAS_PO_ZAMKNIECIU);
-    printf("[DYREKTOR] Ewakuacja logiczna.\n");
-    fflush(stdout);
+    //gotowanie_procesora(CZAS_PO_ZAMKNIECIU);
+    //printf("[DYREKTOR] Ewakuacja logiczna.\n");
+    //fflush(stdout);
 
     sem_p(semid, SEM_MUTEX);
     shm->koniec_pracy = 2;
     sem_v(semid, SEM_MUTEX);
+
+    while (wait(NULL) > 0); 
 
     //Funkcja do czyszczena
     cleanup();
@@ -209,6 +214,8 @@ void init_ipc() {
     //Zerujemy wartości
     shm->kolejka_do_biletow = 0;
     shm->koniec_pracy = 0;
+    shm->sa_zamkiete = 0;
+    shm->brak_petentow = 0;
 }
 
 //Funkcja do forkowania urzędników
@@ -258,7 +265,7 @@ void signal_handler(int sig) {
         if (shm)
             shm->koniec_pracy = 2;
         sem_v(semid, SEM_MUTEX);
-        while (wait(NULL) > 0);
+        cleanup();
         exit(1);
     }
     else if (sig == SIGCHLD){

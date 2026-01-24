@@ -18,12 +18,13 @@
 
 #define MAX_PETENTOW_W_BUDYNKU (2000)
 #define PROG_URUCHOMIENIA_KAS (350)
-#define CZAS_DO_OTWARCIA (2) //Tp
-#define CZAS_PRACY (30) //Tk-Tp
+#define CZAS_DO_OTWARCIA (0) //Tp
+#define CZAS_PRACY (10) //Tk-Tp
 #define CZAS_PO_ZAMKNIECIU (5) //Domślnie 2 minuty wedle założeń projektu
 #define MAX_PROCESOW_PETENTOW (15000) //Będzie przydatne do ograniczenia petentów w generatorze
 #define LIMIT_OSIAGNIETY (-1) //Stała do msgqueue dla czytelności 
 #define POWROT_Z_KASY (-2) //Stała do msgqueue
+#define KONIEC_OBSLUGI (-3) //Stała do msgqueue
 
 //Limity wydziałow:
 #define LIMIT_SA (6000)
@@ -63,6 +64,8 @@ typedef struct {
     int limity_przyjec_sum;
     int koniec_pracy; // 0 - Zakład pracuje, 1 - Zamknięcie(po CZAS_PRACY), 2 - Ewakuacja 
     int liczba_aktywnych_biletomatow; 
+    int sa_zamkiete;
+    int brak_petentow;
 } SharedData;
 
 //Kolejka komunikatów:

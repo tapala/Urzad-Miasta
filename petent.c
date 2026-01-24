@@ -64,8 +64,8 @@ void* opiekun_thread(void *arg)
     if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
         printf("\033[41m[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku\033[m\n", my_pid, cel);
         fflush(stdout);
-        sprintf(log_buf, "[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku \n", my_pid, cel);
-        log_to_file(log_buf);
+        //sprintf(log_buf, "[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku \n", my_pid, cel);
+        //log_to_file(log_buf);
         exit(1);
     }
 
@@ -110,11 +110,12 @@ void petent_loop() {
     //printf("Status: %d; Limit_ok: %d; CEL: %d\n", status, limit_ok, cel);
     //fflush(stdout);
     if (status > 0) {
-
-
         sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0);
         shmdt(shm);
         return;
+    }
+    else{
+        //sem_op(semid, SEM_BUDYNEK, -zajmowane_miejsca, 0);
     }
     // Tworzymy komunikat...
     msg.mtype = 1;
@@ -177,8 +178,8 @@ void petent_loop() {
             sem_v(semid, SEM_MUTEX);
             printf("\033[41m[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku\033[m\n", my_pid, cel);
             fflush(stdout);
-            sprintf(log_buf, "[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku \n", my_pid, cel);
-            log_to_file(log_buf);
+            //sprintf(log_buf, "[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku \n", my_pid, cel);
+            //log_to_file(log_buf);
             exit(1);
         }
 
@@ -209,7 +210,8 @@ void petent_loop() {
         }
 
         msg.typ_sprawy = cel;
-
+        
+        
         if(msgsnd(msg_urzad_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
             fprintf(stderr,"%s -- %d -- Wyjebka na msgsend - Urzednik - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
             kys();
@@ -226,6 +228,10 @@ void petent_loop() {
 
         else if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
             printf("\033[41m\033[30m[PETENT %d] SA nie mogło mnie przekierowac. Pora umierać      \033[m\n", my_pid);
+            break;
+        }
+        else if(msg.typ_sprawy == KONIEC_OBSLUGI){
+            printf("\033[46m\033[34m[PETENT %d] Chcę rozmawiać z menadżerem                       \033[m\n", my_pid);
             break;
         }
         // W przeciwnym razie urzędnik SA nas odesłał do innego urzędnika i musimy powtórzyć proces nadpisując cel(wszystko jest robione na referencji do wiadomości)
