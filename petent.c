@@ -6,7 +6,7 @@ pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 atomic_int bilet_gotowy = 0;
-int shmid, semid,  msg_bilet_id, msg_bilet_back_id, msg_urzad_id, msg_urzad_back_id, cel;
+int shmid, semid,  msg_bilet_id, msg_bilet_back_id, msg_urzad_id, msg_urzad_back_id, cel, queue_id, queue_back_id;
 int zajmowane_miejsca = 1;
 pid_t my_pid;
 char log_buf[256];
@@ -18,6 +18,7 @@ Komunikat msg;
 void kys();
 void petent_loop();
 void* opiekun_thread(void *arg);
+void set_queue_id();
 
 void dzong(){
     fprintf(stderr,"[%d] Im dead\n", getpid());
@@ -27,17 +28,17 @@ int main(int argc, char** argv) {
     //atexit(dzong);
     unsigned int seed = time(NULL) ^ (getpid() << 16);
     srand(seed);
-
+    cel = atoi(argv[1]);
+    set_queue_id();
     // Inicjalizacja handlerów pamięci współdzielonej i kolejki komunikatów
     shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
 
     semid = semget(ftok(FTOK_PATH, ID_SEM), 4, 0);
     msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0);
     msg_bilet_back_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0);
-    msg_urzad_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0);
-    msg_urzad_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_BACK), 0600);
+    msg_urzad_id = msgget(ftok(FTOK_PATH, queue_id), 0);
+    msg_urzad_back_id = msgget(ftok(FTOK_PATH, queue_back_id), 0600);
 
-    cel = atoi(argv[1]);
     petent_loop();
 
     return 0;
@@ -115,7 +116,7 @@ void petent_loop() {
         return;
     }
     else{
-        //sem_op(semid, SEM_BUDYNEK, -zajmowane_miejsca, 0);
+        sem_op(semid, SEM_BUDYNEK, -zajmowane_miejsca, 0);
     }
     // Tworzymy komunikat...
     msg.mtype = 1;
@@ -180,7 +181,7 @@ void petent_loop() {
             fflush(stdout);
             //sprintf(log_buf, "[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku \n", my_pid, cel);
             //log_to_file(log_buf);
-            exit(1);
+            kys();
         }
 
     }
@@ -200,13 +201,13 @@ void petent_loop() {
 
         // Wysyłamy petenta do odpowiedniego urzędasa
         if(msg.kasa_odwiedzona){
-            msg.mtype = cel * 10 + 1;   // Kolejka po powrocie z kasy
+            msg.mtype = 1;   // Kolejka po powrocie z kasy
         }
         else if (vip) {
-            msg.mtype = cel * 10 + 2;   // Kolejka VIP
+            msg.mtype = 2;   // Kolejka VIP
         } 
         else {
-            msg.mtype = cel * 10 + 3;   // Zwykła kolejka
+            msg.mtype = 3;   // Zwykła kolejka
         }
 
         msg.typ_sprawy = cel;
@@ -236,8 +237,12 @@ void petent_loop() {
             break;
         }
         // W przeciwnym razie urzędnik SA nas odesłał do innego urzędnika i musimy powtórzyć proces nadpisując cel(wszystko jest robione na referencji do wiadomości)
-        else
+        else{
             cel = msg.typ_sprawy;
+            set_queue_id();
+            msg_urzad_id = msgget(ftok(FTOK_PATH, queue_id), 0);
+            msg_urzad_back_id = msgget(ftok(FTOK_PATH, queue_back_id), 0);
+        }
     }
 
     // Petent obsłużony wychodzi z budynku
@@ -252,4 +257,31 @@ void kys(){
 
     shmdt(shm);
     exit(1);
+}
+
+void set_queue_id(){
+    if (cel == DEPT_SA){
+        queue_id = ID_MSG_URZAD_SA;
+        queue_back_id = ID_MSG_URZAD_SA_BACK;
+    }
+    else if(cel == DEPT_SC){
+        queue_id = ID_MSG_URZAD_SC;
+        queue_back_id = ID_MSG_URZAD_SC_BACK;
+    }
+    else if(cel == DEPT_KM){
+        queue_id = ID_MSG_URZAD_KM;
+        queue_back_id = ID_MSG_URZAD_KM_BACK;
+    }
+    else if(cel == DEPT_ML){
+        queue_id = ID_MSG_URZAD_ML;
+        queue_back_id = ID_MSG_URZAD_ML_BACK;
+    }
+    else if(cel == DEPT_PD){
+        queue_id = ID_MSG_URZAD_PD;
+        queue_back_id = ID_MSG_URZAD_PD_BACK;
+    }
+    else if(cel == DEPT_KASA){
+        queue_id = ID_MSG_URZAD_KASA;
+        queue_back_id = ID_MSG_URZAD_KASA_BACK;
+    }
 }

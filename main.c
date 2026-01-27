@@ -1,14 +1,16 @@
 #include "common.h"
 
 
-int shmid, semid, msg_bilet_id, msg_bilet_back_id, msg_urzad_id, msg_urzad_back_id, generator_stop_flag;
+int shmid, semid, msg_bilet_id, msg_bilet_back_id, msg_urzad_id, msg_urzad_back_id, generator_stop_flag, msg_urzad_SA_id, msg_urzad_SA_back_id, msg_urzad_SC_id, msg_urzad_SC_back_id, msg_urzad_KM_id, msg_urzad_KM_back_id, msg_urzad_ML_id, msg_urzad_ML_back_id, msg_urzad_PD_id, msg_urzad_PD_back_id, msg_urzad_KASA_id, msg_urzad_KASA_back_id;
 SharedData *shm;
 pid_t generator_pid;
+pid_t urzednicy[6];
 
 void signal_handler(int sig);
 void init_ipc(void);
 void run_urzednik(int dept, int limit);
 void cleanup(void);
+void sojowanie_urzednikow(pid_t pidus_amogus_susus_impostorus);
 
 int main(){
 
@@ -20,43 +22,51 @@ int main(){
     printf("[DYREKTOR] System startuje. Czekamy na Tp - drzwi zamknięte.\n");
 
     //Urzędnicy:
-    if (!fork()) { 
+
+    urzednicy[0] = fork();
+    if (!urzednicy[0]) { 
         run_urzednik(DEPT_SA, LIMIT_SA);
         perror("execl SA");
         exit(0); 
     }
 
-    if (!fork()) { 
+    urzednicy[1] = fork();
+    if (!urzednicy[1]) { 
         run_urzednik(DEPT_SA, LIMIT_SA);
         perror("execl SA");
         exit(0); 
     }
 
-    if (!fork()) { 
+    urzednicy[2] = fork();
+    if (!urzednicy[2]) { 
         run_urzednik(DEPT_SC, LIMIT_SC);
         perror("execl SC");
         exit(0); 
     }
-    
-    if (!fork()) { 
+
+    urzednicy[3] = fork();
+    if (!urzednicy[3]) { 
         run_urzednik(DEPT_KM, LIMIT_KM);
         perror("execl KM");
         exit(0); 
     }
 
-    if (!fork()) { 
+    urzednicy[4] = fork();
+    if (!urzednicy[4]) { 
         run_urzednik(DEPT_ML, LIMIT_ML);
         perror("execl ML");
         exit(0); 
     }
 
-    if (!fork()) { 
+    urzednicy[5] = fork();
+    if (!urzednicy[5]) { 
         run_urzednik(DEPT_PD, LIMIT_PD);
         perror("execl PD");
         exit(0); 
     }
 
-    if (!fork()) { 
+    urzednicy[6] = fork();
+    if (!urzednicy[6]) { 
         run_urzednik(DEPT_KASA, LIMIT_KASA);
         perror("execl kasa");
         exit(0); 
@@ -155,17 +165,14 @@ int main(){
     fflush(stdout);
 
     sem_p(semid, SEM_MUTEX);
-    shm->koniec_pracy = 1;   //Zamknięcie, ale bez ewakuacji
+    shm->koniec_pracy = 1;   //Zamknięcie
     sem_v(semid, SEM_MUTEX);
 
     //gotowanie_procesora(CZAS_PO_ZAMKNIECIU);
-    //printf("[DYREKTOR] Ewakuacja logiczna.\n");
-    //fflush(stdout);
 
-    sem_p(semid, SEM_MUTEX);
-    shm->koniec_pracy = 2;
-    sem_v(semid, SEM_MUTEX);
-
+    for(int i=0; i<7; i++){
+        sojowanie_urzednikow(urzednicy[i]);
+    }
     while (wait(NULL) > 0); 
 
     //Funkcja do czyszczena
@@ -197,9 +204,24 @@ void init_ipc() {
     //Utworzenie kolejek komunikatów
     msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0600 | IPC_CREAT);
     msg_bilet_back_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0600 | IPC_CREAT);
-    msg_urzad_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0600 | IPC_CREAT);
-    msg_urzad_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_BACK), 0600 | IPC_CREAT);
 
+    msg_urzad_SA_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_SA), 0600 | IPC_CREAT);
+    msg_urzad_SA_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_SA_BACK), 0600 | IPC_CREAT);
+
+    msg_urzad_SC_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_SC), 0600 | IPC_CREAT);
+    msg_urzad_SC_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_SC_BACK), 0600 | IPC_CREAT);
+
+    msg_urzad_KM_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_KM), 0600 | IPC_CREAT);
+    msg_urzad_KM_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_KM_BACK), 0600 | IPC_CREAT);
+
+    msg_urzad_ML_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_ML), 0600 | IPC_CREAT);
+    msg_urzad_ML_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_ML_BACK), 0600 | IPC_CREAT);
+
+    msg_urzad_PD_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_PD), 0600 | IPC_CREAT);
+    msg_urzad_PD_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_PD_BACK), 0600 | IPC_CREAT);
+
+    msg_urzad_KASA_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_KASA), 0600 | IPC_CREAT);
+    msg_urzad_KASA_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_KASA_BACK), 0600 | IPC_CREAT);
     
     //Ustawiamy wartości pamięci współdzielonej na nasze stałe
     shm->liczba_aktywnych_biletomatow = 1;
@@ -241,8 +263,27 @@ void cleanup() {
 
     shmctl(shmid, IPC_RMID, NULL);              //Usunięcie segmentu pamięci współ.
     semctl(semid, 0, IPC_RMID);                 //Usunięcie semaforów
+
     msgctl(msg_bilet_id, IPC_RMID, NULL);
     msgctl(msg_bilet_back_id, IPC_RMID, NULL);
+
+    msgctl(msg_urzad_SA_id, IPC_RMID, NULL);
+    msgctl(msg_urzad_SA_back_id, IPC_RMID, NULL);
+
+    msgctl(msg_urzad_SC_id, IPC_RMID, NULL);
+    msgctl(msg_urzad_SC_back_id, IPC_RMID, NULL);
+
+    msgctl(msg_urzad_KM_id, IPC_RMID, NULL);
+    msgctl(msg_urzad_KM_back_id, IPC_RMID, NULL);
+
+    msgctl(msg_urzad_ML_id, IPC_RMID, NULL);
+    msgctl(msg_urzad_ML_back_id, IPC_RMID, NULL);
+    
+    msgctl(msg_urzad_PD_id, IPC_RMID, NULL);
+    msgctl(msg_urzad_PD_back_id, IPC_RMID, NULL);   
+
+    msgctl(msg_urzad_KASA_id, IPC_RMID, NULL);
+    msgctl(msg_urzad_KASA_back_id, IPC_RMID, NULL);
 
     //Usuwanie kolejek komunikatów
     msgctl(msg_urzad_id, IPC_RMID, NULL);
@@ -274,4 +315,8 @@ void signal_handler(int sig) {
     else if (sig == SIGTERM){
         generator_stop_flag = 1;
     }
+}
+
+void sojowanie_urzednikow(pid_t pidus_amogus_susus_impostorus){
+    kill(pidus_amogus_susus_impostorus, SIGUSR1);
 }

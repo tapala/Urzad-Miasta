@@ -4,11 +4,11 @@ void start_urzednik();
 void signal_handler(int a);
 void director_shutdown(int a);
 void setitimer_wrapper(suseconds_t a);
-void queue_cleanup();
+void set_queue_id();
+void empty_msgqueue();
 
-int typ_wydzialu, shmid, semid, msg_urzad, msg_urzad_back;
+int typ_wydzialu, shmid, semid, msg_urzad, msg_urzad_back, queue_id, queue_back_id;
 int close_flag = 0;
-int force_close_flag = 0;
 int sa_zamkiete = 0;
 
 SharedData *shm;
@@ -17,16 +17,48 @@ int main(int argc, char **argv) {
     signal(SIGALRM,signal_handler);
     signal(SIGUSR1,director_shutdown);
     typ_wydzialu = atoi(argv[1]);
+    set_queue_id();
+
+    unsigned int seed = time(NULL) ^ (getpid() << 16);
+    srand(seed);
+
     shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600);
     semid = semget(ftok(FTOK_PATH, ID_SEM), 4, 0600);
-    msg_urzad = msgget(ftok(FTOK_PATH, ID_MSG_URZAD), 0600);
-    msg_urzad_back = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_BACK), 0600);
+    msg_urzad = msgget(ftok(FTOK_PATH, queue_id), 0600);
+    msg_urzad_back = msgget(ftok(FTOK_PATH, queue_back_id), 0600);
     shm = (SharedData*)shmat(shmid, NULL, 0);
     start_urzednik();
 }
 
 void signal_handler(int a){
 
+}
+
+void set_queue_id(){
+    if (typ_wydzialu == DEPT_SA){
+        queue_id = ID_MSG_URZAD_SA;
+        queue_back_id = ID_MSG_URZAD_SA_BACK;
+    }
+    else if(typ_wydzialu == DEPT_SC){
+        queue_id = ID_MSG_URZAD_SC;
+        queue_back_id = ID_MSG_URZAD_SC_BACK;
+    }
+    else if(typ_wydzialu == DEPT_KM){
+        queue_id = ID_MSG_URZAD_KM;
+        queue_back_id = ID_MSG_URZAD_KM_BACK;
+    }
+    else if(typ_wydzialu == DEPT_ML){
+        queue_id = ID_MSG_URZAD_ML;
+        queue_back_id = ID_MSG_URZAD_ML_BACK;
+    }
+    else if(typ_wydzialu == DEPT_PD){
+        queue_id = ID_MSG_URZAD_PD;
+        queue_back_id = ID_MSG_URZAD_PD_BACK;
+    }
+    else if(typ_wydzialu == DEPT_KASA){
+        queue_id = ID_MSG_URZAD_KASA;
+        queue_back_id = ID_MSG_URZAD_KASA_BACK;
+    }
 }
 
 void start_urzednik() {
@@ -43,7 +75,7 @@ void start_urzednik() {
 
     while (!close_flag)
     {
-        usleep(1000000);
+        //usleep(1000000);
         // Sprawdzanie stanu pracy urzędu
         sem_p(semid, SEM_MUTEX);
         int stan = shm->koniec_pracy;
@@ -62,33 +94,14 @@ void start_urzednik() {
             break;
         }   
 
-        //  PRIORYTET VIP w kolejce do urzędnika
-        long kasa_type = typ_wydzialu * 10 + 1;
-        long vip_type = typ_wydzialu * 10 + 2;
-        long normal_type = typ_wydzialu * 10 + 3;
-
-        // Najpierw bierzemy wracających z kasy
-        if(msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), kasa_type, IPC_NOWAIT) == -1){
-            // Potem spróbuj odebrać VIP
-            if (msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), vip_type, IPC_NOWAIT) == -1)
-            {
-                // Brak VIP – odbieramy zwykłych
-                int flag = (stan == 1) ? IPC_NOWAIT : 0;
-                alarm(1);
-                int rc = msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), normal_type, flag);
-                alarm(0);
-                if (rc == -1)
-                {
-                    if(errno != ENOMSG && errno != EINTR){
-                        perror("Wyjebka message queue");
-                    }
-                    else if (stan == 1 || stan == 2)
-                        break; // Koniec dnia + pusta kolejka
-                    continue;  // Nic do roboty więc czeka dalej
-                }
+        if(msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), -3, 0) == -1){
+            if(errno == EINTR){
+                goto signal_skip;
+            }
+            else{
+                perror("Wyjebka message queue");
             }
         }
-
         // Komunikaty informacyjne
         if(typ_wydzialu != DEPT_KASA){
             if (msg.jest_vip)
@@ -104,7 +117,7 @@ void start_urzednik() {
         int cel = 0;
 
         // Jeśli urząd funkcjonuje
-        if (stan == 0) {
+        if (1) {
 
             // Z SA losowo do innych
             if (typ_wydzialu == DEPT_SA && !msg.odeslany_z_sa && (rand() % 100 < 40))
@@ -147,7 +160,7 @@ void start_urzednik() {
                     log_to_file(log_buf);
                 }
                 else{
-                    printf(log_buf, "[URZĘDNIK %d] Przekierowano petenta %d do %d\n", typ_wydzialu, msg.pid_petenta, cel);
+                    printf("[URZĘDNIK %d] Przekierowano petenta %d do %d\n", typ_wydzialu, msg.pid_petenta, cel);
                     //log_to_file(log_buf);
                     fflush(stdout);
                 }
@@ -163,17 +176,19 @@ void start_urzednik() {
         }
 
         // Odsyłamy wiadomość
-        if(typ_wydzialu == DEPT_KASA || typ_wydzialu == DEPT_KASA){
+        if(typ_wydzialu == DEPT_KASA){
             msg.kasa_odwiedzona = 1;
             msg.typ_sprawy = msg.cel_po_kasie; 
         }
         if(msgsnd(msg_urzad_back, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
-            fprintf(stderr,"%s - Wyjebka na msgqueue - %d \n", strerror(errno), __LINE__);
+            fprintf(stderr,"%s - Wyjebka na msgsnd do klienta - %d ||| %d \n", strerror(errno), typ_wydzialu,__LINE__);
         }
     }
 
+    signal_skip:
+
     if(typ_wydzialu != DEPT_SA || sa_zamkiete){
-        queue_cleanup();
+        empty_msgqueue();
     }
 
     printf("\033[33m[URZEDNIK %d] Koniec - obsluzeni: %d\033[m\n",typ_wydzialu, obsluzeni);
@@ -203,16 +218,15 @@ void director_shutdown(int a){
         sem_v(semid, SEM_MUTEX);
         close_flag = 1;
     }
-    force_close_flag = 1;
 }
 
-void empty_msgqueue(long type){
+void empty_msgqueue(){
     while(1){
-        if (msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), type, IPC_NOWAIT) == -1){
+        if (msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), -3, IPC_NOWAIT) == -1){
             if (errno == ENOMSG) {
                 break;
             } 
-            else {
+            else if(errno){
                 fprintf(stderr,"%s - Wyjebka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
                 return;
             }
@@ -226,19 +240,4 @@ void empty_msgqueue(long type){
             } 
         }
     }
-}
-
-void queue_cleanup(){
-    long kasa_type = typ_wydzialu * 10 + 1;
-    long vip_type = typ_wydzialu * 10 + 2;
-    long normal_type = typ_wydzialu * 10 + 3;
-    int cleanup_flag;
-    do{
-        empty_msgqueue(kasa_type);
-        empty_msgqueue(vip_type);
-        empty_msgqueue(normal_type);
-        sem_p(semid, SEM_MUTEX);
-        cleanup_flag = shm->brak_petentow;
-        sem_v(semid, SEM_MUTEX);
-    }while(!cleanup_flag /*&& !force_close_flag*/);
 }

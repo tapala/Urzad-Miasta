@@ -16,10 +16,10 @@
 #include <string.h> 
 #include <sys/wait.h>
 
-#define MAX_PETENTOW_W_BUDYNKU (2000)
+#define MAX_PETENTOW_W_BUDYNKU (15000)
 #define PROG_URUCHOMIENIA_KAS (350)
 #define CZAS_DO_OTWARCIA (0) //Tp
-#define CZAS_PRACY (10) //Tk-Tp
+#define CZAS_PRACY (6) //Tk-Tp
 #define CZAS_PO_ZAMKNIECIU (5) //Domślnie 2 minuty wedle założeń projektu
 #define MAX_PROCESOW_PETENTOW (15000) //Będzie przydatne do ograniczenia petentów w generatorze
 #define LIMIT_OSIAGNIETY (-1) //Stała do msgqueue dla czytelności 
@@ -44,12 +44,31 @@
 
 //Klucze IPC wraz z generatrem
 #define FTOK_PATH "."
-#define ID_SHM (10) //Pamięć współdzielona
-#define ID_SEM (11) //Teblica Semaforów
-#define ID_MSG_BILET (12) //Kolejka Komunikatów - Penent(lub SA) => Biletomat
-#define ID_MSG_BILET_BACK (13) //Kolejka Komunikatów - Petent <= Biletomat
-#define ID_MSG_URZAD (14) //Kolejka Kpnikatów - Petent => Urzędnik
-#define ID_MSG_URZAD_BACK 9 //Kolejka Kpnikatów - Petent <= Urzędnik
+#define ID_SHM (9) //Pamięć współdzielona
+#define ID_SEM (10) //Teblica Semaforów
+#define ID_MSG_BILET (11) //Kolejka Komunikatów - Penent(lub SA) => Biletomat
+#define ID_MSG_BILET_BACK (12) //Kolejka Komunikatów - Petent <= Biletomat
+
+#define ID_MSG_URZAD (13) //Kolejka Kpnikatów - Petent => Urzędnik
+#define ID_MSG_URZAD_BACK (14) //Kolejka Kpnikatów - Petent <= Urzędnik
+
+#define ID_MSG_URZAD_SA (13) //Kolejka Kpnikatów - Petent => Urzędnik
+#define ID_MSG_URZAD_SA_BACK (14) //Kolejka Kpnikatów - Petent <= Urzędnik
+
+#define ID_MSG_URZAD_SC (15) //Kolejka Kpnikatów - Petent => Urzędnik
+#define ID_MSG_URZAD_SC_BACK (16) //Kolejka Kpnikatów - Petent <= Urzędnik
+
+#define ID_MSG_URZAD_KM (17) //Kolejka Kpnikatów - Petent => Urzędnik
+#define ID_MSG_URZAD_KM_BACK (18) //Kolejka Kpnikatów - Petent <= Urzędnik
+
+#define ID_MSG_URZAD_ML (19) //Kolejka Kpnikatów - Petent => Urzędnik
+#define ID_MSG_URZAD_ML_BACK (20) //Kolejka Kpnikatów - Petent <= Urzędnik
+
+#define ID_MSG_URZAD_PD (21) //Kolejka Kpnikatów - Petent => Urzędnik
+#define ID_MSG_URZAD_PD_BACK (22) //Kolejka Kpnikatów - Petent <= Urzędnik
+
+#define ID_MSG_URZAD_KASA (23) //Kolejka Kpnikatów - Petent => Urzędnik
+#define ID_MSG_URZAD_KASA_BACK (24) //Kolejka Kpnikatów - Petent <= Urzędnik
 
 //Identyfikatory semaforów
 #define SEM_MUTEX (0) // Chroni pamięć dzieloną
