@@ -14,8 +14,8 @@ int sa_zamkiete = 0;
 SharedData *shm;
 Komunikat msg;
 int main(int argc, char **argv) {
-    signal(SIGALRM,signal_handler);
-    signal(SIGUSR1,director_shutdown);
+    signal(SIGALRM, signal_handler);
+    signal(SIGUSR1, director_shutdown);
     typ_wydzialu = atoi(argv[1]);
     set_queue_id();
 
@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
     srand(seed);
 
     shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600);
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 4, 0600);
+    semid = semget(ftok(FTOK_PATH, ID_SEM), 5, 0600);
     msg_urzad = msgget(ftok(FTOK_PATH, queue_id), 0600);
     msg_urzad_back = msgget(ftok(FTOK_PATH, queue_back_id), 0600);
     shm = (SharedData*)shmat(shmid, NULL, 0);
@@ -62,7 +62,7 @@ void set_queue_id(){
 }
 
 void start_urzednik() {
-
+    usleep(1000000);
     // Inicjalizacja pamięci, semaforów, kolejki komunikatów
     int msg_bilet = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0600);
     int msg_bilet_back = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0600);
@@ -193,7 +193,7 @@ void start_urzednik() {
     printf("\033[33m[URZEDNIK %d] Koniec - obsluzeni: %d\033[m\n",typ_wydzialu, obsluzeni);
     // Odłączenie pamięci współdzielonej po zakończeniu loopa - ewakuacja
     shmdt(shm);
-    
+    sem_v(semid, SEM_LOCK_REGISTER);
 }
 
 void director_shutdown(int a){

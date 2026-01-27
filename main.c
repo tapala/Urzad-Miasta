@@ -144,6 +144,7 @@ int main(){
         sem_p(semid, SEM_MUTEX);
         shm->brak_petentow = 1;
         sem_v(semid, SEM_MUTEX);
+        
         exit(0);
     }
 
@@ -168,11 +169,16 @@ int main(){
     shm->koniec_pracy = 1;   //Zamknięcie
     sem_v(semid, SEM_MUTEX);
 
-    //gotowanie_procesora(CZAS_PO_ZAMKNIECIU);
-
     for(int i=0; i<7; i++){
         sojowanie_urzednikow(urzednicy[i]);
     }
+
+    sem_op(semid, SEM_LOCK_REGISTER, -7, 0);
+
+    sem_p(semid, SEM_MUTEX);
+    shm->koniec_pracy = 3;   //Zamknięcie Biletomatów
+    sem_v(semid, SEM_MUTEX);
+
     while (wait(NULL) > 0); 
 
     //Funkcja do czyszczena
@@ -195,11 +201,12 @@ void init_ipc() {
     shm = (SharedData*)shmat(shmid, NULL, 0);
     
     //Utworzenie tablicy 3 semaforów i przypisanie im wstępnych wartości
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 4, 0600 | IPC_CREAT);
+    semid = semget(ftok(FTOK_PATH, ID_SEM), 5, 0600 | IPC_CREAT);
     semctl(semid, SEM_MUTEX, SETVAL, 1);                                                            //Nasz Mutexik
     semctl(semid, SEM_BUDYNEK, SETVAL, 0);                                                          //Wpuszczanie do budynku
     semctl(semid, SEM_PETENCI, SETVAL, MAX_PROCESOW_PETENTOW);                                      //Ogranicznik petentów
-    semctl(semid, SEM_LOG_MUTEX, SETVAL, 1);                                                        //Muteks Logi
+    semctl(semid, SEM_LOG_MUTEX, SETVAL, 1);   
+    semctl(semid, SEM_LOG_MUTEX, SETVAL, 0);                                                      //Muteks Logi
 
     //Utworzenie kolejek komunikatów
     msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0600 | IPC_CREAT);
@@ -231,7 +238,7 @@ void init_ipc() {
     shm->limity_przyjec[DEPT_ML] = LIMIT_ML;
     shm->limity_przyjec[DEPT_PD] = LIMIT_PD;
     shm->limity_przyjec[DEPT_KASA] = LIMIT_KASA;                                            //Dodane w celu testowania - jak się będzie psuć to do wywalenia
-    shm->limity_przyjec_sum = (LIMIT_KM + LIMIT_ML + LIMIT_PD + LIMIT_SA + LIMIT_SC);
+    shm->limity_przyjec_sum = MAX_BILETOW;
 
     //Zerujemy wartości
     shm->kolejka_do_biletow = 0;
@@ -257,6 +264,7 @@ void run_urzednik(int dept, int limit) {
 
 //Funkcja czyszcząca
 void cleanup() {
+
     //Odłączenie pamięci
     if (shm != NULL)
         shmdt(shm);

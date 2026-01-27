@@ -16,23 +16,24 @@
 #include <string.h> 
 #include <sys/wait.h>
 
-#define MAX_PETENTOW_W_BUDYNKU (15000)
+#define MAX_PETENTOW_W_BUDYNKU (2000)
 #define PROG_URUCHOMIENIA_KAS (350)
 #define CZAS_DO_OTWARCIA (0) //Tp
 #define CZAS_PRACY (6) //Tk-Tp
 #define CZAS_PO_ZAMKNIECIU (5) //Domślnie 2 minuty wedle założeń projektu
-#define MAX_PROCESOW_PETENTOW (15000) //Będzie przydatne do ograniczenia petentów w generatorze
+#define MAX_PROCESOW_PETENTOW (8000) //Będzie przydatne do ograniczenia petentów w generatorze
 #define LIMIT_OSIAGNIETY (-1) //Stała do msgqueue dla czytelności 
 #define POWROT_Z_KASY (-2) //Stała do msgqueue
 #define KONIEC_OBSLUGI (-3) //Stała do msgqueue
 
 //Limity wydziałow:
-#define LIMIT_SA (6000)
+#define LIMIT_SA (3000)
 #define LIMIT_SC (1000)
 #define LIMIT_KM (1000)
 #define LIMIT_ML (1000)
 #define LIMIT_PD (1000)
 #define LIMIT_KASA (999999999)
+#define MAX_BILETOW (LIMIT_SA + LIMIT_SC + LIMIT_KM + LIMIT_ML +LIMIT_PD)
 
 //Identyfikatory wydziałow i kasy - przyda się do obsługi p[etenta]
 #define DEPT_SA (1)
@@ -75,6 +76,7 @@
 #define SEM_BUDYNEK (1) //Semafor na 'wpuszczanie' petentów do budynku
 #define SEM_PETENCI (2) //Semafor ograniczający istniejących procesów petentów
 #define SEM_LOG_MUTEX (3)
+#define SEM_LOCK_REGISTER (4)
 
 //Pamięć współdzielona:
 typedef struct { 
@@ -99,6 +101,7 @@ typedef struct {
     int kasa_odwiedzona; // Flaga informująca, że petent był już w kasie
     int wiek; // Wiek petenta 
     int wiek_opiekuna; // >25 jeśli petent <18, wedle tych przeklętych wymagań
+    int nr_biletu; // Bo tak
 } Komunikat;
 
 // Deklaracje funkcji pomocniczych  

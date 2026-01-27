@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
     // Inicjalizacja handlerów pamięci współdzielonej i kolejki komunikatów
     shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
 
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 4, 0);
+    semid = semget(ftok(FTOK_PATH, ID_SEM), 5, 0);
     msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0);
     msg_bilet_back_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0);
     msg_urzad_id = msgget(ftok(FTOK_PATH, queue_id), 0);
@@ -65,6 +65,7 @@ void* opiekun_thread(void *arg)
     if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
         printf("\033[41m[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku\033[m\n", my_pid, cel);
         fflush(stdout);
+        sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0);
         exit(1);
     }
 
@@ -101,6 +102,7 @@ void petent_loop() {
         sem_v(semid, SEM_MUTEX);
         printf("\033[44m\033[33m[PETENT %d] Brak miejsc u urzedników. Z zalu popelniam sudoku\033[m\n", my_pid);
         fflush(stdout);
+        shmdt(shm);
         exit(1);
     }
     sem_v(semid, SEM_MUTEX);
@@ -112,7 +114,7 @@ void petent_loop() {
 
     if (status > 0) {
         shmdt(shm);
-        return;
+        exit(1);
     }
     else{
         sem_op(semid, SEM_BUDYNEK, -zajmowane_miejsca, 0);
@@ -128,6 +130,7 @@ void petent_loop() {
     msg.cel_po_kasie = 0;
     msg.kasa_odwiedzona = 0;
     msg.odeslany_z_sa = 0;
+    msg.nr_biletu = -1;
 
     // Jeśli dziecko -> odpal wątek opiekuna
     if (wiek < 18) {
@@ -175,7 +178,7 @@ void petent_loop() {
 
     }
 
-        // ...a na koniec zmniejszamy piczbę petentów w kolejce o 1
+    // ...a na koniec zmniejszamy piczbę petentów w kolejce o 1
     sem_p(semid, SEM_MUTEX);
     shm->kolejka_do_biletow--;
     sem_v(semid, SEM_MUTEX);
@@ -221,6 +224,9 @@ void petent_loop() {
             break;
         }
         else if(msg.typ_sprawy == KONIEC_OBSLUGI){
+            sleep(CZAS_PO_ZAMKNIECIU);
+            sprintf(log_buf, "[PETENT %d - NR BILETU %d] Jestem sfrustrowany - nie wejde do %d\n", my_pid, msg.nr_biletu, cel);
+            log_to_file(log_buf, semid);
             printf("\033[46m\033[34m[PETENT %d] Chcę rozmawiać z menadżerem                       \033[m\n", my_pid);
             fflush(stdout);
             break;

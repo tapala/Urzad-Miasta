@@ -6,15 +6,19 @@
 
 pid_t kasy[MAX_BILETOMATY];
 int liczba_biletomatow = 0;
+int nr_biletu = 0;
+int run_flag = 1;
 int shmid, semid;
 SharedData *shm;
+
+void signal_handler(int sig);
 
 void biletomat_loop(){
     int msg_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0);
     int msg_back_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0);
     Komunikat msg;
 
-    while (1) {
+    while (run_flag) {
         if (msgrcv(msg_id, &msg, sizeof(Komunikat) - sizeof(long), 1, 0) == -1){
             fprintf(stderr,"%s -- %d -- Wyjebka na msgrcv - %s => %d \n", strerror(errno), getpid(),__FILE__,__LINE__);
         }
@@ -25,15 +29,23 @@ void biletomat_loop(){
         if(shm->limity_przyjec[msg.typ_sprawy] > 0){
             shm->limity_przyjec_sum--;
             shm->limity_przyjec[msg.typ_sprawy]--;
+            msg.nr_biletu = MAX_BILETOW - shm->limity_przyjec_sum;
         }
         else 
             msg.typ_sprawy = LIMIT_OSIAGNIETY;
         sem_v(semid, SEM_MUTEX);
 
+        try_again:
         if(msgsnd(msg_back_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
-            fprintf(stderr,"%s -- %d -- Wyjebka na msgsnd - %s => %d \n", strerror(errno), getpid(),__FILE__,__LINE__);
+            if(errno == EINTR){
+                goto try_again;
+            }
+            else{
+                fprintf(stderr,"%s -- %d -- Wyjebka na msgsnd - %s => %d \n", strerror(errno), getpid(),__FILE__,__LINE__);
+            }
         }
-    };
+    }
+    exit(1);
 }
 
 
@@ -50,6 +62,7 @@ void uruchom_biletomat(){
         return;
     }
     else if (pid == 0) {
+        signal(SIGTERM, signal_handler);
         biletomat_loop();
         exit(0);
     }
@@ -74,7 +87,7 @@ void zamkni_biletomat() {
 
 int main() {
     shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 4, 0);
+    semid = semget(ftok(FTOK_PATH, ID_SEM), 5, 0);
 
     shm = (SharedData*)shmat(shmid, NULL, 0);
 
@@ -89,7 +102,7 @@ int main() {
         sem_v(semid, SEM_MUTEX);
 
         // Ewakuacja
-        if (status == 1 || status == 2) {
+        if (status == 3) {
             break;
         }
 
@@ -123,7 +136,15 @@ int main() {
     while (liczba_biletomatow > 0)
         zamkni_biletomat();
 
+    while (wait(NULL) > 0); 
     shmdt(shm);
     printf("[REJESTRACJA] Zamykanie systemu biletowego\n");
     return 0;
+}
+
+
+void signal_handler(int sig) {
+    if (sig == SIGTERM){
+        run_flag = 0;
+    }
 }
