@@ -117,7 +117,7 @@ void start_urzednik() {
         int cel = 0;
 
         // Jeśli urząd funkcjonuje
-        if (1) {
+        if (stan == 0) {
 
             // Z SA losowo do innych
             if (typ_wydzialu == DEPT_SA && !msg.odeslany_z_sa && (rand() % 100 < 40))
@@ -157,11 +157,10 @@ void start_urzednik() {
 
                 if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
                     sprintf(log_buf, "[URZĘDNIK %d] Brak miejsc u urzednika %d dla Petenta %d\n", typ_wydzialu, cel, msg.pid_petenta);
-                    log_to_file(log_buf);
+                    log_to_file(log_buf, semid);
                 }
                 else{
                     printf("[URZĘDNIK %d] Przekierowano petenta %d do %d\n", typ_wydzialu, msg.pid_petenta, cel);
-                    //log_to_file(log_buf);
                     fflush(stdout);
                 }
             }

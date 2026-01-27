@@ -102,7 +102,7 @@ typedef struct {
 } Komunikat;
 
 // Deklaracje funkcji pomocniczych  
-void log_to_file(const char *msg); 
+void log_to_file(const char *msg, int semid); 
 void sem_p(int semid, int sem_num); 
 void sem_v(int semid, int sem_num); 
 void sem_op(int semid, int sem_num, int op, short flag);

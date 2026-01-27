@@ -65,8 +65,6 @@ void* opiekun_thread(void *arg)
     if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
         printf("\033[41m[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku\033[m\n", my_pid, cel);
         fflush(stdout);
-        //sprintf(log_buf, "[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku \n", my_pid, cel);
-        //log_to_file(log_buf);
         exit(1);
     }
 
@@ -98,26 +96,28 @@ void petent_loop() {
         zajmowane_miejsca = 2;
     }
 
-    // Opuszczamy semafor budynku i blokujemy pamięć współdzieloną
+    sem_p(semid, SEM_MUTEX);
+    if(!shm->limity_przyjec_sum){
+        sem_v(semid, SEM_MUTEX);
+        printf("\033[44m\033[33m[PETENT %d] Brak miejsc u urzedników. Z zalu popelniam sudoku\033[m\n", my_pid);
+        fflush(stdout);
+        exit(1);
+    }
+    sem_v(semid, SEM_MUTEX);
 
-    
     sem_p(semid, SEM_MUTEX);
     int status = shm->koniec_pracy;
 
-    // Odblokowywujemy pamięć współdzieloną
     sem_v(semid, SEM_MUTEX);
 
-    // Jeśli urząd przestał pracować lub limit został przekroczony petent wychodzi z budynku i kończy swój proces
-    //printf("Status: %d; Limit_ok: %d; CEL: %d\n", status, limit_ok, cel);
-    //fflush(stdout);
     if (status > 0) {
-        sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0);
         shmdt(shm);
         return;
     }
     else{
         sem_op(semid, SEM_BUDYNEK, -zajmowane_miejsca, 0);
     }
+
     // Tworzymy komunikat...
     msg.mtype = 1;
     msg.pid_petenta = my_pid;
@@ -128,15 +128,6 @@ void petent_loop() {
     msg.cel_po_kasie = 0;
     msg.kasa_odwiedzona = 0;
     msg.odeslany_z_sa = 0;
-
-    sem_p(semid, SEM_MUTEX);
-    if(!shm->limity_przyjec_sum){
-        sem_v(semid, SEM_MUTEX);
-        printf("\033[44m\033[33m[PETENT %d] Brak miejsc u urzedników. Z zalu popelniam sudoku\033[m\n", my_pid);
-        fflush(stdout);
-        exit(1);
-    }
-    sem_v(semid, SEM_MUTEX);
 
     // Jeśli dziecko -> odpal wątek opiekuna
     if (wiek < 18) {
@@ -179,8 +170,6 @@ void petent_loop() {
             sem_v(semid, SEM_MUTEX);
             printf("\033[41m[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku\033[m\n", my_pid, cel);
             fflush(stdout);
-            //sprintf(log_buf, "[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku \n", my_pid, cel);
-            //log_to_file(log_buf);
             kys();
         }
 

@@ -36,12 +36,14 @@ int semt_op(int semid, int sem_num, int op, long nanotime) {
 int semt_p(int semid, int sem_num, long nanotime) { return semt_op(semid, sem_num, -1, nanotime); } 
 int semt_v(int semid, int sem_num, long nanotime) { return semt_op(semid, sem_num, 1, nanotime); }
 // Logowanie do pliku
-void log_to_file(const char *msg) { 
+void log_to_file(const char *msg, int semid) {
+    sem_p(semid, SEM_LOG_MUTEX); 
     FILE *f = fopen("raport.txt", "a"); 
     if (f) { 
         fprintf(f, "%s", msg); 
         fclose(f); 
     } 
+    sem_v(semid, SEM_LOG_MUTEX); 
 }
 
 void gotowanie_procesora(int seconds){
