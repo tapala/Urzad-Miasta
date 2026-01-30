@@ -6,6 +6,7 @@ void director_shutdown(int a);
 void setitimer_wrapper(suseconds_t a);
 void set_queue_id();
 void empty_msgqueue();
+void czysciciel();
 
 int typ_wydzialu, shmid, semid, msg_urzad, msg_urzad_back, queue_id, queue_back_id;
 int close_flag = 0;
@@ -15,7 +16,7 @@ volatile int sigflag = 0;
 SharedData *shm;
 Komunikat msg;
 int main(int argc, char **argv) {
-    signal(SIGUSR1, director_shutdown);
+    signal(SIGUSR1, signal_handler);
     signal(SIGRTMIN, signal_handler);
     typ_wydzialu = atoi(argv[1]);
     set_queue_id();
@@ -33,37 +34,44 @@ int main(int argc, char **argv) {
 
 void signal_handler(int sig){
     if(sig == SIGRTMIN){
-        sigflag = 1;
-        set_queue_id();
-        int a1 = 1;
-        int a2 = 1;
-        while(a1 || a2){
-            if(a1){
-                if (msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), -3, IPC_NOWAIT) == -1){
-                    if (errno == ENOMSG) {
-                        a1 = 0;
-                    } 
-                    else if(errno == EINTR){
-                        continue;
-                    }
-                    else if(errno){
-                        fprintf(stderr,"%s - Wyjebka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
-                        return;
-                    }
+        czysciciel();
+    }
+    else if(sig == SIGUSR1){
+        director_shutdown();
+    }
+}
+
+void czysciciel(){
+    sigflag = 1;
+    set_queue_id();
+    int a1 = 1;
+    int a2 = 1;
+    while(a1 || a2){
+        if(a1){
+            if (msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), -3, IPC_NOWAIT) == -1){
+                if (errno == ENOMSG) {
+                    a1 = 0;
+                } 
+                else if(errno == EINTR){
+                    continue;
+                }
+                else if(errno){
+                    fprintf(stderr,"%s - Wyjebka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
+                    return;
                 }
             }
-            if(a2){
-                if (msgrcv(msg_urzad_back, &msg, sizeof(Komunikat) - sizeof(long), -3, IPC_NOWAIT) == -1){
-                    if (errno == ENOMSG) {
-                        a2 = 0;
-                    } 
-                    else if(errno == EINTR){
-                        continue;
-                    }
-                    else if(errno){
-                        fprintf(stderr,"%s - Wyjebka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
-                        return;
-                    }
+        }
+        if(a2){
+            if (msgrcv(msg_urzad_back, &msg, sizeof(Komunikat) - sizeof(long), -3, IPC_NOWAIT) == -1){
+                if (errno == ENOMSG) {
+                    a2 = 0;
+                } 
+                else if(errno == EINTR){
+                    continue;
+                }
+                else if(errno){
+                    fprintf(stderr,"%s - Wyjebka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
+                    return;
                 }
             }
         }
@@ -261,7 +269,7 @@ void start_urzednik() {
     while(sem_v(semid, SEM_LOCK_REGISTER));
 }
 
-void director_shutdown(int a){
+void director_shutdown(){
     if (typ_wydzialu == DEPT_SA){
         sa_zamkiete = shm->sa_zamkiete;
         while(sem_p(semid, SEM_MUTEX));
