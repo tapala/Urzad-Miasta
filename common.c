@@ -1,19 +1,25 @@
 #include "common.h"
 
 // Funkcje semaforów 
-void sem_op(int semid, int sem_num, int op, short flag) { 
+int sem_op(int semid, int sem_num, int op, short flag) { 
     struct sembuf s; 
     s.sem_num = sem_num; 
     s.sem_op = op; 
     s.sem_flg = flag; 
     if (semop(semid, &s, 1) == -1){
-        if (errno != EIDRM && errno != EINVAL) {
+        if (errno == EINTR)
+        {
+            return -1;
+        }
+        else if (errno != EIDRM && errno != EINVAL) {
             perror("semop");
+            exit(1);
         }
     }
+    return 0;
 } 
-void sem_p(int semid, int sem_num) { sem_op(semid, sem_num, -1, 0); } 
-void sem_v(int semid, int sem_num) { sem_op(semid, sem_num, 1, 0); }
+int sem_p(int semid, int sem_num) { return sem_op(semid, sem_num, -1, 0); } 
+int sem_v(int semid, int sem_num) { return sem_op(semid, sem_num, 1, 0); }
 
 int semt_op(int semid, int sem_num, int op, long nanotime) { 
     struct sembuf s; 

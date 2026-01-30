@@ -11,10 +11,13 @@ void init_ipc(void);
 void run_urzednik(int dept, int limit);
 void cleanup(void);
 void sojowanie_urzednikow(pid_t pidus_amogus_susus_impostorus);
+void generator();
 
 int main(){
 
     signal(SIGINT, signal_handler);
+    signal(SIGRTMIN, signal_handler);
+    signal(SIGUSR2, signal_handler);
     //srand(time(NULL));
     generator_stop_flag = 0;
     init_ipc();
@@ -83,70 +86,7 @@ int main(){
 
     //Generator petentów:
     generator_pid = fork();                                             //Forkujemy mmaina         
-    if (!generator_pid) {                                           //Jeśli dzieciak to dajemy mu przywilej bycia generatorem, aż do śmierci 
-        signal(SIGCHLD, signal_handler);
-        signal(SIGTERM, signal_handler);
-        while (1) {                                                     //Generator pracuje do zamknięcia urzędu
-            //Generator pracuje do zamknięcia urzędu
-            sem_p(semid, SEM_MUTEX);
-            int status = shm->koniec_pracy;
-            sem_v(semid, SEM_MUTEX);
-
-            if (status == 1 || status == 2 || generator_stop_flag) break;
-            //while (waitpid(-1, NULL, WNOHANG) > 0) {}
-
-            // Opuszczamy semafor naszego bufora petentów w celu zapobiegnięcia nadmiernego wykożystania procesora
-            struct sembuf s; 
-            s.sem_num = SEM_PETENCI; 
-            s.sem_op = -1; 
-            s.sem_flg = IPC_NOWAIT; 
-            if (semop(semid, &s, 1) == -1){
-                if(errno == EAGAIN){
-                    fprintf(stderr,"%s -- %s -- Generator wykona nie robi wincyj petentow => %d \n", strerror(errno),__FILE__,__LINE__);
-                    break;
-                }
-                else if (errno != EIDRM && errno != EINVAL) {
-                    perror("semop");
-                }
-            }                           
-            //usleep(1000);
-            pid_t child = fork();                                       //Forkujemy nasz generator
-            if (child == -1){
-                fprintf(stderr,"%s -- %s -- Wyjebka na Generator => %d \n", strerror(errno),__FILE__,__LINE__);
-            }
-            if (!child) {   
-                unsigned int seed = time(NULL) ^ (getpid() << 16);
-                srand(seed);
-                int r = rand() % 100;
-                int cel;
-                if (r < 60) cel = DEPT_SA;
-                else if (r < 70) cel = DEPT_SC;
-                else if (r < 80) cel = DEPT_KM;
-                else if (r < 90) cel = DEPT_ML;
-                else cel = DEPT_PD;                                    //Jeśli jest dzieciakiem to przerabiamy go na petenta
-                char huj[16];
-                //sem_p(semid, SEM_MUTEX);
-                //printf("PID: %d; CEL: %d; LIMIT: %d\n", getpid(), cel,shm->limity_przyjec[cel]);
-                //fflush(stdout);
-                sem_v(semid, SEM_MUTEX);
-                snprintf(huj, sizeof(huj), "%d", cel);
-                execl("./petent", "petent", huj ,NULL);
-                //Jeśli tu jesteśmy, exec jebnął
-                perror("execl petent");
-                exit(1);
-            }
-
-            //printf("Wygenerowano petenta o id = %d\n", child);
-            //Gdyby ktoś chciał to jest lekki opóźniacz do generatora petentów
-            //usleep((rand() % 400 + 100) * 10);
-        }
-        while(wait(NULL)>0);
-        sem_p(semid, SEM_MUTEX);
-        shm->brak_petentow = 1;
-        sem_v(semid, SEM_MUTEX);
-        
-        exit(0);
-    }
+    generator();
 
 
     //----------- HARMONOGRAM -------------
@@ -203,10 +143,10 @@ void init_ipc() {
     //Utworzenie tablicy 3 semaforów i przypisanie im wstępnych wartości
     semid = semget(ftok(FTOK_PATH, ID_SEM), 5, 0600 | IPC_CREAT);
     semctl(semid, SEM_MUTEX, SETVAL, 1);                                                            //Nasz Mutexik
-    semctl(semid, SEM_BUDYNEK, SETVAL, 0);                                                          //Wpuszczanie do budynku
+    semctl(semid, SEM_BUDYNEK, SETVAL, MAX_PETENTOW_W_BUDYNKU);                                                          //Wpuszczanie do budynku
     semctl(semid, SEM_PETENCI, SETVAL, MAX_PROCESOW_PETENTOW);                                      //Ogranicznik petentów
-    semctl(semid, SEM_LOG_MUTEX, SETVAL, 1);   
-    semctl(semid, SEM_LOG_MUTEX, SETVAL, 0);                                                      //Muteks Logi
+    semctl(semid, SEM_LOG_MUTEX, SETVAL, 1);                                                       //Muteks Logi
+    semctl(semid, SEM_LOCK_REGISTER, SETVAL, 0);
 
     //Utworzenie kolejek komunikatów
     msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0600 | IPC_CREAT);
@@ -323,8 +263,81 @@ void signal_handler(int sig) {
     else if (sig == SIGTERM){
         generator_stop_flag = 1;
     }
+    else if(sig == SIGUSR2){
+        if(generator_pid){
+            kill(0, SIGRTMIN);
+        }
+        else{
+            generator_stop_flag = 1;
+        }
+    }
 }
 
 void sojowanie_urzednikow(pid_t pidus_amogus_susus_impostorus){
     kill(pidus_amogus_susus_impostorus, SIGUSR1);
+}
+
+void generator(){
+    if (!generator_pid) {                                           //Jeśli dzieciak to dajemy mu przywilej bycia generatorem, aż do śmierci 
+        signal(SIGCHLD, signal_handler);
+        signal(SIGTERM, signal_handler);
+        signal(SIGRTMIN, signal_handler);
+        while (1) {                                                     //Generator pracuje do zamknięcia urzędu
+            //Generator pracuje do zamknięcia urzędu
+            while(sem_p(semid, SEM_MUTEX));
+            int status = shm->koniec_pracy;
+            while(sem_v(semid, SEM_MUTEX));
+
+            if (status == 1 || status == 2 || generator_stop_flag) break;
+            //while (waitpid(-1, NULL, WNOHANG) > 0) {}
+
+            // Opuszczamy semafor naszego bufora petentów w celu zapobiegnięcia nadmiernego wykożystania procesora
+            struct sembuf s; 
+            s.sem_num = SEM_PETENCI; 
+            s.sem_op = -1; 
+            s.sem_flg = IPC_NOWAIT; 
+            if (semop(semid, &s, 1) == -1){
+                if(errno == EAGAIN){
+                    printf("Limit osiągnięty - generator wykona nie robi wincyj petentow \n");
+                    fflush(stdout);
+                    break;
+                }
+                else if (errno != EIDRM && errno != EINVAL) {
+                    perror("semop");
+                    exit(1);
+                }
+            }                           
+            pid_t child = fork();                                       //Forkujemy nasz generator
+            if (child == -1){
+                fprintf(stderr,"%s -- %s -- Wyjebka na Generator => %d \n", strerror(errno),__FILE__,__LINE__);
+                exit(1);
+            }
+            if (!child) {   
+                unsigned int seed = time(NULL) ^ (getpid() << 16);
+                srand(seed);
+                int r = rand() % 100;
+                int cel;
+                if (r < 60) cel = DEPT_SA;
+                else if (r < 70) cel = DEPT_SC;
+                else if (r < 80) cel = DEPT_KM;
+                else if (r < 90) cel = DEPT_ML;
+                else cel = DEPT_PD;                                    //Jeśli jest dzieciakiem to przerabiamy go na petenta
+                char kamilek[16];
+
+                while(sem_v(semid, SEM_MUTEX));
+                snprintf(kamilek, sizeof(kamilek), "%d", cel);
+                execl("./petent", "petent", kamilek ,NULL);
+                //Jeśli tu jesteśmy, exec jebnął
+                perror("execl petent");
+                exit(1);
+            }
+        }
+        while(wait(NULL)>0);
+
+        while(sem_p(semid, SEM_MUTEX));
+        shm->brak_petentow = 1;
+        while(sem_v(semid, SEM_MUTEX));
+        
+        exit(0);
+    }
 }

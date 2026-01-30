@@ -20,12 +20,18 @@ void biletomat_loop(){
 
     while (run_flag) {
         if (msgrcv(msg_id, &msg, sizeof(Komunikat) - sizeof(long), 1, 0) == -1){
-            fprintf(stderr,"%s -- %d -- Wyjebka na msgrcv - %s => %d \n", strerror(errno), getpid(),__FILE__,__LINE__);
+            if(errno == EINTR){
+                continue;
+            }
+            else{
+                fprintf(stderr,"%s -- %d -- Wyjebka na msgrcv - %s => %d \n", strerror(errno), getpid(),__FILE__,__LINE__);
+                exit(1);
+            }
         }
         msg.mtype = msg.pid_petenta;
         
         // Zmniejszenie limitu w SHM
-        sem_p(semid, SEM_MUTEX);
+        while(sem_p(semid, SEM_MUTEX));
         if(shm->limity_przyjec[msg.typ_sprawy] > 0){
             shm->limity_przyjec_sum--;
             shm->limity_przyjec[msg.typ_sprawy]--;
@@ -33,7 +39,8 @@ void biletomat_loop(){
         }
         else 
             msg.typ_sprawy = LIMIT_OSIAGNIETY;
-        sem_v(semid, SEM_MUTEX);
+
+        while(sem_v(semid, SEM_MUTEX));
 
         try_again:
         if(msgsnd(msg_back_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
@@ -96,10 +103,10 @@ int main() {
     while (1) {
 
         // Wcztanie z pamięci współdzielonej
-        sem_p(semid, SEM_MUTEX);
+        while(sem_p(semid, SEM_MUTEX));
         int kolejka = shm->kolejka_do_biletow;
         int status = shm->koniec_pracy;
-        sem_v(semid, SEM_MUTEX);
+        while(sem_v(semid, SEM_MUTEX));
 
         // Ewakuacja
         if (status == 3) {

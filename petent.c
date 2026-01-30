@@ -20,12 +20,8 @@ void petent_loop();
 void* opiekun_thread(void *arg);
 void set_queue_id();
 
-void dzong(){
-    fprintf(stderr,"[%d] Im dead\n", getpid());
-}
-
 int main(int argc, char** argv) {
-    //atexit(dzong);
+    signal(SIGRTMIN, kys);
     unsigned int seed = time(NULL) ^ (getpid() << 16);
     srand(seed);
     cel = atoi(argv[1]);
@@ -227,7 +223,7 @@ void petent_loop() {
             sleep(CZAS_PO_ZAMKNIECIU);
             sprintf(log_buf, "[PETENT %d - NR BILETU %d] Jestem sfrustrowany - nie wejde do %d\n", my_pid, msg.nr_biletu, cel);
             log_to_file(log_buf, semid);
-            printf("\033[46m\033[34m[PETENT %d] Chcę rozmawiać z menadżerem                       \033[m\n", my_pid);
+            printf("\033[46m\033[34m[PETENT %d] Jestem Sfrustrowany                       \033[m\n", my_pid);
             fflush(stdout);
             break;
         }
