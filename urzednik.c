@@ -38,28 +38,32 @@ void signal_handler(int sig){
         int a1 = 1;
         int a2 = 1;
         while(a1 || a2){
-            if (msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), -3, IPC_NOWAIT) == -1){
-                if (errno == ENOMSG) {
-                    a1 = 0;
-                } 
-                else if(errno == EINTR){
-                    continue;
-                }
-                else if(errno){
-                    fprintf(stderr,"%s - Wyjebka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
-                    return;
+            if(a1){
+                if (msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), -3, IPC_NOWAIT) == -1){
+                    if (errno == ENOMSG) {
+                        a1 = 0;
+                    } 
+                    else if(errno == EINTR){
+                        continue;
+                    }
+                    else if(errno){
+                        fprintf(stderr,"%s - Wyjebka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
+                        return;
+                    }
                 }
             }
-            if (msgrcv(msg_urzad_back, &msg, sizeof(Komunikat) - sizeof(long), -3, IPC_NOWAIT) == -1){
-                if (errno == ENOMSG) {
-                    a2 = 0;
-                } 
-                else if(errno == EINTR){
-                    continue;
-                }
-                else if(errno){
-                    fprintf(stderr,"%s - Wyjebka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
-                    return;
+            if(a2){
+                if (msgrcv(msg_urzad_back, &msg, sizeof(Komunikat) - sizeof(long), -3, IPC_NOWAIT) == -1){
+                    if (errno == ENOMSG) {
+                        a2 = 0;
+                    } 
+                    else if(errno == EINTR){
+                        continue;
+                    }
+                    else if(errno){
+                        fprintf(stderr,"%s - Wyjebka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
+                        return;
+                    }
                 }
             }
         }
