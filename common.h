@@ -17,21 +17,21 @@
 #include <sys/wait.h>
 
 #define MAX_PETENTOW_W_BUDYNKU (2000)
-#define PROG_URUCHOMIENIA_KAS (350)
-#define CZAS_DO_OTWARCIA (0) //Tp
-#define CZAS_PRACY (6) //Tk-Tp
-#define CZAS_PO_ZAMKNIECIU (5) //Domślnie 2 minuty wedle założeń projektu
-#define MAX_PROCESOW_PETENTOW (8000) //Będzie przydatne do ograniczenia petentów w generatorze
+#define PROG_URUCHOMIENIA_KAS (750)
+#define CZAS_DO_OTWARCIA (5) //Tp
+#define CZAS_PRACY (10) //Tk-Tp
+#define CZAS_PO_ZAMKNIECIU (0) //Domślnie 2 minuty wedle założeń projektu
+#define MAX_PROCESOW_PETENTOW (3000) //Będzie przydatne do ograniczenia petentów w generatorze
 #define LIMIT_OSIAGNIETY (-1) //Stała do msgqueue dla czytelności 
 #define POWROT_Z_KASY (-2) //Stała do msgqueue
 #define KONIEC_OBSLUGI (-3) //Stała do msgqueue
 
 //Limity wydziałow:
-#define LIMIT_SA (3000)
-#define LIMIT_SC (1000)
-#define LIMIT_KM (1000)
-#define LIMIT_ML (1000)
-#define LIMIT_PD (1000)
+#define LIMIT_SA (12000)
+#define LIMIT_SC (2000)
+#define LIMIT_KM (2000)
+#define LIMIT_ML (2000)
+#define LIMIT_PD (2000)
 #define LIMIT_KASA (999999999)
 #define MAX_BILETOW (LIMIT_SA + LIMIT_SC + LIMIT_KM + LIMIT_ML +LIMIT_PD)
 
@@ -106,9 +106,9 @@ typedef struct {
 
 // Deklaracje funkcji pomocniczych  
 void log_to_file(const char *msg, int semid); 
-void sem_p(int semid, int sem_num); 
-void sem_v(int semid, int sem_num); 
-void sem_op(int semid, int sem_num, int op, short flag);
+int sem_p(int semid, int sem_num); 
+int sem_v(int semid, int sem_num); 
+int sem_op(int semid, int sem_num, int op, short flag);
 int semt_p(int semid, int sem_num, long nanotime); 
 int semt_v(int semid, int sem_num, long nanotime); 
 int semt_op(int semid, int sem_num, int op, long nanotime);
