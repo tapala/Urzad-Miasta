@@ -284,32 +284,11 @@ void generator(){
         signal(SIGRTMIN, signal_handler);
         while (1) {                                                     //Generator pracuje do zamknięcia urzędu
             //Generator pracuje do zamknięcia urzędu
-            while(sem_p(semid, SEM_MUTEX));
-            int status = shm->koniec_pracy;
-            while(sem_v(semid, SEM_MUTEX));
-
-            if (status == 1 || status == 2 || generator_stop_flag) break;
+            if (generator_stop_flag) break;
             while (waitpid(-1, NULL, WNOHANG) > 0);
 
             // Opuszczamy semafor naszego bufora petentów w celu zapobiegnięcia nadmiernego wykożystania procesora
-            struct sembuf s; 
-            s.sem_num = SEM_PETENCI; 
-            s.sem_op = -1; 
-            s.sem_flg = 0; 
-            if (semop(semid, &s, 1) == -1){
-                if(errno == EAGAIN){
-                    printf("Limit osiągnięty - generator wykona nie robi wincyj petentow \n");
-                    fflush(stdout);
-                    break;
-                }
-                if(errno == EINTR){
-                    continue;
-                }
-                else if (errno != EIDRM && errno != EINVAL) {
-                    perror("semop");
-                    exit(1);
-                }
-            }                           
+            if(sem_p(semid, SEM_PETENCI)) continue;                      
             pid_t child = fork();                                       //Forkujemy nasz generator
             if (child == -1){
                 fprintf(stderr,"%s -- %s -- Wyjebka na Generator => %d \n", strerror(errno),__FILE__,__LINE__);
@@ -327,7 +306,6 @@ void generator(){
                 else cel = DEPT_PD;                                    //Jeśli jest dzieciakiem to przerabiamy go na petenta
                 char kamilek[16];
 
-                //while(sem_v(semid, SEM_MUTEX));
                 snprintf(kamilek, sizeof(kamilek), "%d", cel);
                 execl("./petent", "petent", kamilek ,NULL);
                 //Jeśli tu jesteśmy, exec jebnął
