@@ -253,7 +253,6 @@ void petent_loop() {
 
 void kys(){
     sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0);
-
     shmdt(shm);
     exit(1);
 }
@@ -305,10 +304,10 @@ void restore_signal(void) {
 
 void sem_p_mutex() {
     block_signal();
-    while(sem_p(semid, SEM_MUTEX));
+    sem_p(semid, SEM_MUTEX);
 }
 
 void sem_v_mutex() {
-    while(sem_v(semid, SEM_MUTEX));
+    sem_v(semid, SEM_MUTEX);
     restore_signal();
 }

@@ -95,7 +95,7 @@ void zamkni_biletomat() {
 int main() {
     shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
     semid = semget(ftok(FTOK_PATH, ID_SEM), 5, 0);
-
+    signal(SIGRTMIN, signal_handler);
     shm = (SharedData*)shmat(shmid, NULL, 0);
 
     printf("[REJESTRACJA] System biletowy uruchomiony\n");

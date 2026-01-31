@@ -267,7 +267,9 @@ void signal_handler(int sig) {
         if(generator_pid){
             kill(0, SIGRTMIN);
         }
-        else{
+    }
+    else if(sig == SIGRTMIN){
+        if(!generator_pid){
             generator_stop_flag = 1;
         }
     }
