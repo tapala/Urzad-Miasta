@@ -175,7 +175,6 @@ void init_ipc() {
     msg_urzad_KASA_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_KASA_BACK), 0600 | IPC_CREAT);
     
     //Ustawiamy wartości pamięci współdzielonej na nasze stałe
-    shm->liczba_aktywnych_biletomatow = 1;
     shm->limity_przyjec[DEPT_SA] = LIMIT_SA;
     shm->limity_przyjec[DEPT_SC] = LIMIT_SC;
     shm->limity_przyjec[DEPT_KM] = LIMIT_KM;

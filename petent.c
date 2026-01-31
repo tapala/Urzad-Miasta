@@ -89,11 +89,16 @@ void petent_loop() {
 
     // Ustawiamy/losujemy początkowe dane
     my_pid = getpid();
-    //int cel = 0;
     int vip = (rand() % 100 < 2);
 
     // Obsługa wieku
-    int wiek = (rand() % 90) + 1;               // Losujemy Wiek
+    int wiek;
+    
+    if(vip)
+        wiek = (rand() % 73) + 18;
+    else
+        wiek = (rand() % 90) + 1;               // Losujemy Wiek
+
     int wiek_opiekuna = 0;
 
     if (wiek < 18) {                            // Jeśli dziecko to losujemy wiek opiekuna i ustawiamy zajmowane miejsce na 2
