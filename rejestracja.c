@@ -94,7 +94,7 @@ void zamkni_biletomat() {
 
 int main() {
     shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 5, 0);
+    semid = semget(ftok(FTOK_PATH, ID_SEM), 6, 0);
     signal(SIGRTMIN, signal_handler);
     shm = (SharedData*)shmat(shmid, NULL, 0);
 
@@ -120,8 +120,8 @@ int main() {
 
         // Ustalenie liczby docelowej kas
         int docelowe = 1;
-        if (kolejka > 2 * K) docelowe = 3;
-        else if (kolejka > K) docelowe = 2;
+        if (kolejka > 2 * PROG_URUCHOMIENIA_KAS) docelowe = 3;
+        else if (kolejka > PROG_URUCHOMIENIA_KAS) docelowe = 2;
 
         // Histereza(swoją drogą bardzo fajne słówko) kas
         if (liczba_biletomatow == 3 && kolejka < (2 * N) / 3)

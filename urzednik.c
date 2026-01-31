@@ -8,10 +8,13 @@ void set_queue_id();
 void empty_msgqueue();
 void czysciciel();
 
-int typ_wydzialu, shmid, semid, msg_urzad, msg_urzad_back, queue_id, queue_back_id;
+int typ_wydzialu, monitor_offset,shmid, semid, msg_urzad, msg_urzad_back, queue_id, queue_back_id, obsluzeni;
 int close_flag = 0;
 int sa_zamkiete = 0;
 volatile int sigflag = 0;
+
+int mshmid;
+MonitorData *mshm;
 
 SharedData *shm;
 Komunikat msg;
@@ -19,17 +22,21 @@ int main(int argc, char **argv) {
     signal(SIGUSR1, signal_handler);
     signal(SIGRTMIN, signal_handler);
     typ_wydzialu = atoi(argv[1]);
+    monitor_offset = atoi(argv[2]);
     set_queue_id();
 
     unsigned int seed = time(NULL) ^ (getpid() << 16);
     srand(seed);
 
     shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600);
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 5, 0600);
+    semid = semget(ftok(FTOK_PATH, ID_SEM), 6, 0600);
     msg_urzad = msgget(ftok(FTOK_PATH, queue_id), 0600);
     msg_urzad_back = msgget(ftok(FTOK_PATH, queue_back_id), 0600);
     shm = (SharedData*)shmat(shmid, NULL, 0);
+    mshmid = shmget(ftok(FTOK_PATH, ID_SHM_MONITOR), sizeof(MonitorData), 0600);
+    mshm = (MonitorData*)shmat(mshmid, NULL, 0);
     start_urzednik();
+    
 }
 
 void signal_handler(int sig){
@@ -111,7 +118,7 @@ void start_urzednik() {
     int msg_bilet_back = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0600);
 
     // Podstawowy syf
-    int obsluzeni = 0;
+    obsluzeni = 0;
     char log_buf[256];
 
     printf("[URZĘDNIK %d] Rozpoczyna pracę.\n", typ_wydzialu);
@@ -146,14 +153,18 @@ void start_urzednik() {
                 perror("Wyjebka message queue");
             }
         }
+
         // Komunikaty informacyjne
         if(typ_wydzialu != DEPT_KASA){
-            if (msg.jest_vip)
+            if (msg.jest_vip){
                 printf("\033[35m[URZĘDNIK %d] OBSŁUGA VIP PID %d\033[m\n", typ_wydzialu, msg.pid_petenta);
-            else if (msg.wiek < 18)
+            }
+            else if (msg.wiek < 18){
                 printf("\033[38;5;207m[URZĘDNIK %d] Obsługa dziecka z opiekunem(PID %d)\033[m\n", typ_wydzialu, msg.pid_petenta);
-            else
+            }
+            else{
                 printf("\033[32m[URZĘDNIK %d] Obsługa dorosłego(PID %d)\033[m\n", typ_wydzialu, msg.pid_petenta);
+            }
         }
 
         // Przekierowania
@@ -191,6 +202,7 @@ void start_urzednik() {
 
             if(cel != DEPT_KASA){
                 msg.mtype = 1;
+
                 repeat_150:
                 if(msgsnd(msg_bilet, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
                     if(errno == EINTR){
@@ -233,7 +245,13 @@ void start_urzednik() {
             msg.typ_sprawy = 0;
         }
         if(cel != DEPT_KASA){
+            while(sem_p(semid, SEM_MONITOR_MUTEX));
+            if(msg.jest_vip){
+                mshm->vipy[typ_wydzialu - monitor_offset]++;
+            }
             obsluzeni++;
+            mshm->obslozeni[typ_wydzialu - monitor_offset]++;
+            while(sem_v(semid, SEM_MONITOR_MUTEX));
         }
 
         // Odsyłamy wiadomość

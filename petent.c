@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
     // Inicjalizacja handlerów pamięci współdzielonej i kolejki komunikatów
     shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
 
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 5, 0);
+    semid = semget(ftok(FTOK_PATH, ID_SEM), 6, 0);
     msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0);
     msg_bilet_back_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0);
     msg_urzad_id = msgget(ftok(FTOK_PATH, queue_id), 0);
@@ -93,7 +93,7 @@ void petent_loop() {
 
     // Obsługa wieku
     int wiek;
-    
+
     if(vip)
         wiek = (rand() % 73) + 18;
     else
@@ -198,7 +198,7 @@ void petent_loop() {
         int status = shm->koniec_pracy;
         sem_v_mutex();
 
-        if (status == 2) break;
+        if (status > 0) break;
 
         // Wysyłamy petenta do odpowiedniego urzędasa
         if(msg.kasa_odwiedzona){

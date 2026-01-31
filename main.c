@@ -2,13 +2,15 @@
 
 
 int shmid, semid, msg_bilet_id, msg_bilet_back_id, msg_urzad_id, msg_urzad_back_id, generator_stop_flag, msg_urzad_SA_id, msg_urzad_SA_back_id, msg_urzad_SC_id, msg_urzad_SC_back_id, msg_urzad_KM_id, msg_urzad_KM_back_id, msg_urzad_ML_id, msg_urzad_ML_back_id, msg_urzad_PD_id, msg_urzad_PD_back_id, msg_urzad_KASA_id, msg_urzad_KASA_back_id;
+int mshmid;
+MonitorData *mshm;
 SharedData *shm;
 pid_t generator_pid;
 pid_t urzednicy[6];
 
 void signal_handler(int sig);
 void init_ipc(void);
-void run_urzednik(int dept, int limit);
+void run_urzednik(int dept, int offset);
 void cleanup(void);
 void sojowanie_urzednikow(pid_t pidus_amogus_susus_impostorus);
 void generator();
@@ -28,49 +30,49 @@ int main(){
 
     urzednicy[0] = fork();
     if (!urzednicy[0]) { 
-        run_urzednik(DEPT_SA, LIMIT_SA);
+        run_urzednik(DEPT_SA, 1);
         perror("execl SA");
         exit(0); 
     }
 
     urzednicy[1] = fork();
     if (!urzednicy[1]) { 
-        run_urzednik(DEPT_SA, LIMIT_SA);
+        run_urzednik(DEPT_SA, 0);
         perror("execl SA");
         exit(0); 
     }
 
     urzednicy[2] = fork();
     if (!urzednicy[2]) { 
-        run_urzednik(DEPT_SC, LIMIT_SC);
+        run_urzednik(DEPT_SC, 0);
         perror("execl SC");
         exit(0); 
     }
 
     urzednicy[3] = fork();
     if (!urzednicy[3]) { 
-        run_urzednik(DEPT_KM, LIMIT_KM);
+        run_urzednik(DEPT_KM, 0);
         perror("execl KM");
         exit(0); 
     }
 
     urzednicy[4] = fork();
     if (!urzednicy[4]) { 
-        run_urzednik(DEPT_ML, LIMIT_ML);
+        run_urzednik(DEPT_ML, 0);
         perror("execl ML");
         exit(0); 
     }
 
     urzednicy[5] = fork();
     if (!urzednicy[5]) { 
-        run_urzednik(DEPT_PD, LIMIT_PD);
+        run_urzednik(DEPT_PD, 0);
         perror("execl PD");
         exit(0); 
     }
 
     urzednicy[6] = fork();
     if (!urzednicy[6]) { 
-        run_urzednik(DEPT_KASA, LIMIT_KASA);
+        run_urzednik(DEPT_KASA, 0);
         perror("execl kasa");
         exit(0); 
     }
@@ -143,14 +145,17 @@ void init_ipc() {
     //Utworzenie pamięci współdzielonej
     shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600 | IPC_CREAT);
     shm = (SharedData*)shmat(shmid, NULL, 0);
-    
+    mshmid = shmget(ftok(FTOK_PATH, ID_SHM_MONITOR), sizeof(MonitorData), 0600 | IPC_CREAT);
+    mshm = (MonitorData*)shmat(mshmid, NULL, 0);
+
     //Utworzenie tablicy 3 semaforów i przypisanie im wstępnych wartości
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 5, 0600 | IPC_CREAT);
+    semid = semget(ftok(FTOK_PATH, ID_SEM), 6, 0600 | IPC_CREAT);
     semctl(semid, SEM_MUTEX, SETVAL, 1);                                                            //Nasz Mutexik
     semctl(semid, SEM_BUDYNEK, SETVAL, 0);                                                          //Wpuszczanie do budynku
     semctl(semid, SEM_PETENCI, SETVAL, MAX_PROCESOW_PETENTOW);                                      //Ogranicznik petentów
     semctl(semid, SEM_LOG_MUTEX, SETVAL, 1);                                                       //Muteks Logi
     semctl(semid, SEM_LOCK_REGISTER, SETVAL, 0);
+    semctl(semid, SEM_MONITOR_MUTEX, SETVAL, 1);     
 
     //Utworzenie kolejek komunikatów
     msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0600 | IPC_CREAT);
@@ -188,17 +193,20 @@ void init_ipc() {
     shm->koniec_pracy = 0;
     shm->sa_zamkiete = 0;
     shm->brak_petentow = 0;
+
+    memset(mshm->obslozeni, 0, sizeof(mshm->obslozeni));
+    memset(mshm->vipy, 0, sizeof(mshm->vipy));
 }
 
 //Funkcja do forkowania urzędników
-void run_urzednik(int dept, int limit) {
+void run_urzednik(int dept, int offset) {
     char dept_str[16];
-    char limit_str[16];
+    char offset_str[16];
 
     snprintf(dept_str, sizeof(dept_str), "%d", dept);
-    snprintf(limit_str, sizeof(limit_str), "%d", limit);
+    snprintf(offset_str, sizeof(offset_str), "%d", offset);
 
-    execl("./urzednik", "urzednik", dept_str, NULL);
+    execl("./urzednik", "urzednik", dept_str, offset_str, NULL);
 
     perror("execl urzednik");
     exit(1);
@@ -212,6 +220,10 @@ void cleanup() {
     if (shm != NULL)
         shmdt(shm);
 
+    if (mshm != NULL)
+        shmdt(mshm);
+
+    shmctl(mshmid, IPC_RMID, NULL);
     shmctl(shmid, IPC_RMID, NULL);              //Usunięcie segmentu pamięci współ.
     semctl(semid, 0, IPC_RMID);                 //Usunięcie semaforów
 
