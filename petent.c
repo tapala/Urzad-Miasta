@@ -19,9 +19,11 @@ void kys();
 void petent_loop();
 void* opiekun_thread(void *arg);
 void set_queue_id();
+void atexit_action(void);
 
 int main(int argc, char** argv) {
     signal(SIGRTMIN, kys);
+    atexit(atexit_action);
     unsigned int seed = time(NULL) ^ (getpid() << 16);
     srand(seed);
     cel = atoi(argv[1]);
@@ -61,8 +63,7 @@ void* opiekun_thread(void *arg)
     if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
         printf("\033[41m[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku\033[m\n", my_pid, cel);
         fflush(stdout);
-        sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0);
-        exit(1);
+        kys();
     }
 
     // Informacja dla dziecka - wręczenie biletu
@@ -275,4 +276,8 @@ void set_queue_id(){
         queue_id = ID_MSG_URZAD_KASA;
         queue_back_id = ID_MSG_URZAD_KASA_BACK;
     }
+}
+
+void atexit_action(void){
+    while(sem_v(semid, SEM_PETENCI));
 }

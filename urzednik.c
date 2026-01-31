@@ -2,7 +2,7 @@
 
 void start_urzednik();
 void signal_handler(int a);
-void director_shutdown(int a);
+void director_shutdown();
 void setitimer_wrapper(suseconds_t a);
 void set_queue_id();
 void empty_msgqueue();

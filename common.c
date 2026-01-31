@@ -12,7 +12,7 @@ int sem_op(int semid, int sem_num, int op, short flag) {
             return -1;
         }
         else if (errno != EIDRM && errno != EINVAL) {
-            perror("semop");
+            fprintf(stderr,"%s -- %s -- %d; Semop %d\n", strerror(errno),__FILE__,__LINE__, sem_num);
             exit(1);
         }
     }
