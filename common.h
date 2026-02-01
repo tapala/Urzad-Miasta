@@ -117,4 +117,9 @@ key_t ftok_handler(const char *path, int proj_id);
 int msgget_CREATE_handler(const char *path, int proj_id);
 void semctl_SETVAL_handler(int semid, int sem_name,int value);
 void msgctl_IPC_RMID_handler(int msqid);
+void init_signals(void);
+void block_signal(void);
+void restore_signal(void);
+void sem_p_mutex(int semid);
+void sem_v_mutex(int semid);
 #endif

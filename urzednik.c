@@ -27,13 +27,14 @@ int main(int argc, char **argv) {
 
     unsigned int seed = time(NULL) ^ (getpid() << 16);
     srand(seed);
+    init_signals();
 
-    shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600);
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 6, 0600);
-    msg_urzad = msgget(ftok(FTOK_PATH, queue_id), 0600);
-    msg_urzad_back = msgget(ftok(FTOK_PATH, queue_back_id), 0600);
+    shmid = shmget(ftok_handler(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600);
+    semid = semget(ftok_handler(FTOK_PATH, ID_SEM), 6, 0600);
+    msg_urzad = msgget(ftok_handler(FTOK_PATH, queue_id), 0600);
+    msg_urzad_back = msgget(ftok_handler(FTOK_PATH, queue_back_id), 0600);
     shm = (SharedData*)shmat(shmid, NULL, 0);
-    mshmid = shmget(ftok(FTOK_PATH, ID_SHM_MONITOR), sizeof(MonitorData), 0600);
+    mshmid = shmget(ftok_handler(FTOK_PATH, ID_SHM_MONITOR), sizeof(MonitorData), 0600);
     mshm = (MonitorData*)shmat(mshmid, NULL, 0);
     start_urzednik();
     
@@ -114,8 +115,8 @@ void set_queue_id(){
 
 void start_urzednik() {
     // Inicjalizacja pamięci, semaforów, kolejki komunikatów
-    int msg_bilet = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0600);
-    int msg_bilet_back = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0600);
+    int msg_bilet = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET), 0600);
+    int msg_bilet_back = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET_BACK), 0600);
 
     // Podstawowy syf
     obsluzeni = 0;
@@ -126,20 +127,20 @@ void start_urzednik() {
     while (!close_flag)
     {
         // Sprawdzanie stanu pracy urzędu
-        while(sem_p(semid, SEM_MUTEX));
+        sem_p_mutex(semid);
         int stan = shm->koniec_pracy;
-        while(sem_v(semid, SEM_MUTEX));
+        sem_v_mutex(semid);
 
         // Ewakuacja natychmiastowa
         if (stan > 0){
-            while(sem_p(semid, SEM_MUTEX));
+            sem_p_mutex(semid);
             if (!(shm->sa_zamkiete)){
                 shm->sa_zamkiete = 1;
             }
             else{
                 sa_zamkiete = 1;
             }
-            while(sem_v(semid, SEM_MUTEX));
+            sem_v_mutex(semid);
             break;
         }   
 
@@ -277,8 +278,6 @@ void start_urzednik() {
 
     if(typ_wydzialu != DEPT_SA || sa_zamkiete){
         empty_msgqueue();
-        msgctl(msg_urzad, IPC_RMID, NULL);
-        msgctl(msg_urzad_back, IPC_RMID, NULL);
     }
 
     printf("\033[33m[URZEDNIK %d] Koniec - obsluzeni: %d\033[m\n",typ_wydzialu, obsluzeni);
@@ -290,7 +289,7 @@ void start_urzednik() {
 void director_shutdown(){
     if (typ_wydzialu == DEPT_SA){
         sa_zamkiete = shm->sa_zamkiete;
-        while(sem_p(semid, SEM_MUTEX));
+        sem_p_mutex(semid);
         if(sa_zamkiete){
             shm->limity_przyjec_sum -= shm->limity_przyjec[typ_wydzialu];
             shm->limity_przyjec[typ_wydzialu] = 0;
@@ -298,14 +297,14 @@ void director_shutdown(){
         else{
             shm->sa_zamkiete = 1;
         }
-        while(sem_v(semid, SEM_MUTEX));
+        sem_v_mutex(semid);
         close_flag = 1;
     }
     else{
-        while(sem_p(semid, SEM_MUTEX));
+        sem_p_mutex(semid);
         shm->limity_przyjec_sum -= shm->limity_przyjec[typ_wydzialu];
         shm->limity_przyjec[typ_wydzialu] = 0;
-        while(sem_v(semid, SEM_MUTEX));
+        sem_v_mutex(semid);
         close_flag = 1;
     }
 }

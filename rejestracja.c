@@ -36,7 +36,7 @@ void biletomat_loop(){
         msg.mtype = msg.pid_petenta;
         
         // Zmniejszenie limitu w SHM
-        while(sem_p(semid, SEM_MUTEX));
+        sem_p_mutex(semid);
         if(shm->limity_przyjec[msg.typ_sprawy] > 0){
             shm->limity_przyjec_sum--;
             shm->limity_przyjec[msg.typ_sprawy]--;
@@ -45,7 +45,7 @@ void biletomat_loop(){
         else 
             msg.typ_sprawy = LIMIT_OSIAGNIETY;
 
-        while(sem_v(semid, SEM_MUTEX));
+        sem_v_mutex(semid);
 
         try_again:
         if(msgsnd(msg_back_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
@@ -123,15 +123,16 @@ int main() {
         perror("shmget biletomat");
         exit(1);
     }
+    init_signals();
     printf("[REJESTRACJA] System biletowy uruchomiony\n");
 
     while (1) {
 
         // Wcztanie z pamięci współdzielonej
-        while(sem_p(semid, SEM_MUTEX));
+        sem_p_mutex(semid);
         int kolejka = shm->kolejka_do_biletow;
         int status = shm->koniec_pracy;
-        while(sem_v(semid, SEM_MUTEX));
+        sem_v_mutex(semid);
 
         // Ewakuacja
         if (status == 3) {

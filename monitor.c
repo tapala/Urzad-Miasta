@@ -39,11 +39,11 @@ int main(){
 }
 
 void refresh_data(){
-    while(sem_p(semid, SEM_MUTEX));
+    sem_p_mutex(semid);
     kolejka_biletowa = shm->kolejka_do_biletow;
     memcpy(limity, shm->limity_przyjec, sizeof limity);
     status = shm->koniec_pracy;
-    while(sem_v(semid, SEM_MUTEX));
+    sem_v_mutex(semid);
 
     while(sem_p(semid, SEM_MONITOR_MUTEX));
     memcpy(obslozeni, mshm->obslozeni, sizeof obslozeni);

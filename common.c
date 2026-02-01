@@ -1,5 +1,7 @@
 #include "common.h"
 
+static sigset_t old_sigset, new_sigset;
+
 // Funkcje semaforów 
 int sem_op(int semid, int sem_num, int op, short flag) { 
     struct sembuf s; 
@@ -76,4 +78,31 @@ void msgctl_IPC_RMID_handler(int msqid){
         perror("msgctl IPC_RMID");
         exit(1);
     }
+}
+
+void init_signals(void) {
+    sigemptyset(&new_sigset);
+    sigaddset(&new_sigset, SIGRTMIN);
+}
+
+void block_signal(void) {
+    if (pthread_sigmask(SIG_BLOCK, &new_sigset, &old_sigset) != 0) {
+        perror("pthread_sigmask block");
+    }
+}
+
+void restore_signal(void) {
+    if (pthread_sigmask(SIG_SETMASK, &old_sigset, NULL) != 0) {
+        perror("pthread_sigmask restore");
+    }
+}
+
+void sem_p_mutex(int semid) {
+    block_signal();
+    while(sem_p(semid, SEM_MUTEX));
+}
+
+void sem_v_mutex(int semid) {
+    while(sem_v(semid, SEM_MUTEX));
+    restore_signal();
 }

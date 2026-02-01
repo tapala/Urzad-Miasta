@@ -15,15 +15,15 @@ SharedData *shm;
 
 Komunikat msg;
 
-sigset_t old_sigset, new_sigset;
+//sigset_t old_sigset, new_sigset;
 
 void kys();
 void petent_loop();
 void* opiekun_thread(void *arg);
 void set_queue_id();
 void atexit_action(void);
-void sem_p_mutex();
-void sem_v_mutex();
+//void sem_p_mutex(semid);
+//void sem_v_mutex(semid);
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -48,6 +48,8 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
+    init_signals();
+
     unsigned int seed = time(NULL) ^ (getpid() << 16);
     srand(seed);
     set_queue_id();
@@ -63,6 +65,8 @@ int main(int argc, char** argv) {
         perror("semget petent");
         exit(1);
     }
+
+    init_signals();
 
     msg_bilet_id = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET), 0);
     msg_bilet_back_id = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET_BACK), 0);
@@ -96,9 +100,9 @@ void* opiekun_thread(void *arg)
     (void)arg;
     int ret;
     // Wejście do kolejki biletowej
-    sem_p_mutex();
+    sem_p_mutex(semid);
     shm->kolejka_do_biletow++;
-    sem_v_mutex();
+    sem_v_mutex(semid);
 
     // Wysłanie żądania biletu
     if(msgsnd(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
@@ -115,9 +119,9 @@ void* opiekun_thread(void *arg)
     if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
         printf("\033[41m[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku\033[m\n", my_pid, cel);
         fflush(stdout);
-        sem_p_mutex();
+        sem_p_mutex(semid);
         shm->kolejka_do_biletow--;
-        sem_v_mutex();
+        sem_v_mutex(semid);
         kys();
     }
 
@@ -168,20 +172,20 @@ void petent_loop() {
         zajmowane_miejsca = 2;
     }
 
-    sem_p_mutex();
+    sem_p_mutex(semid);
     if(!shm->limity_przyjec_sum){
-        sem_v_mutex();
+        sem_v_mutex(semid);
         printf("\033[44m\033[33m[PETENT %d] Brak miejsc u urzedników. Z zalu popelniam sudoku\033[m\n", my_pid);
         fflush(stdout);
         shmdt(shm);
         exit(1);
     }
-    sem_v_mutex();
+    sem_v_mutex(semid);
 
-    sem_p_mutex();
+    sem_p_mutex(semid);
     int status = shm->koniec_pracy;
 
-    sem_v_mutex();
+    sem_v_mutex(semid);
 
     if (status > 0) {
         shmdt(shm);
@@ -244,9 +248,9 @@ void petent_loop() {
     // Dorosły działa jak wcześniej
     else {
         
-        sem_p_mutex();
+        sem_p_mutex(semid);
         shm->kolejka_do_biletow++;
-        sem_v_mutex();
+        sem_v_mutex(semid);
 
         // Komunikat wysyłamy do do biletomatu...
         if(msgsnd(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
@@ -265,9 +269,9 @@ void petent_loop() {
         }
 
         if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
-            sem_p_mutex();
+            sem_p_mutex(semid);
             shm->kolejka_do_biletow--;
-            sem_v_mutex();
+            sem_v_mutex(semid);
             printf("\033[41m[PETENT %d] Brak miejsc u urzednika %d. Z zalu popelniam sudoku\033[m\n", my_pid, cel);
             fflush(stdout);
             kys();
@@ -276,15 +280,15 @@ void petent_loop() {
     }
 
     // ...a na koniec zmniejszamy piczbę petentów w kolejce o 1
-    sem_p_mutex();
+    sem_p_mutex(semid);
     shm->kolejka_do_biletow--;
-    sem_v_mutex();
+    sem_v_mutex(semid);
 
     while (1) {
 
-        sem_p_mutex();
+        sem_p_mutex(semid);
         int status = shm->koniec_pracy;
-        sem_v_mutex();
+        sem_v_mutex(semid);
 
         if (status > 0) break;
 
@@ -398,26 +402,26 @@ void atexit_action(void){
     while(sem_v(semid, SEM_PETENCI));
 }
 
-void block_signal(void) {
-    sigemptyset(&new_sigset);
-    sigaddset(&new_sigset, SIGRTMIN);
-    if (pthread_sigmask(SIG_BLOCK, &new_sigset, &old_sigset) != 0) {
-        perror("pthread_sigmask block");
-    }
-}
-
-void restore_signal(void) {
-    if (pthread_sigmask(SIG_SETMASK, &old_sigset, NULL) != 0) {
-        perror("pthread_sigmask restore");
-    }
-}
-
-void sem_p_mutex() {
-    block_signal();
-    while(sem_p(semid, SEM_MUTEX));
-}
-
-void sem_v_mutex() {
-    while(sem_v(semid, SEM_MUTEX));
-    restore_signal();
-}
+//void block_signal(void) {
+//    sigemptyset(&new_sigset);
+//    sigaddset(&new_sigset, SIGRTMIN);
+//    if (pthread_sigmask(SIG_BLOCK, &new_sigset, &old_sigset) != 0) {
+//        perror("pthread_sigmask block");
+//    }
+//}
+//
+//void restore_signal(void) {
+//    if (pthread_sigmask(SIG_SETMASK, &old_sigset, NULL) != 0) {
+//        perror("pthread_sigmask restore");
+//    }
+//}
+//
+//void sem_p_mutex() {
+//    block_signal();
+//    while(sem_p(semid, SEM_MUTEX));
+//}
+//
+//void sem_v_mutex() {
+//    while(sem_v(semid, SEM_MUTEX));
+//    restore_signal();
+//}

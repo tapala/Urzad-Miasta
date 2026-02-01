@@ -18,6 +18,8 @@ void zamykanie();
 
 int main(){
 
+    init_signals();
+
     if (signal(SIGINT, signal_handler) == SIG_ERR || signal(SIGRTMIN, signal_handler) == SIG_ERR || signal(SIGUSR2, signal_handler) == SIG_ERR){
         perror("signal main");
         exit(1);
@@ -370,9 +372,9 @@ void zamykanie(){
     printf("[DYREKTOR] Tk — zamykamy, nowi nie wchodzą.\n");
     fflush(stdout);
 
-    while(sem_p(semid, SEM_MUTEX));
+    sem_p_mutex(semid);
     shm->koniec_pracy = 1;   //Zamknięcie
-    while(sem_v(semid, SEM_MUTEX));
+    sem_v_mutex(semid);
 
     for(int i=0; i<7; i++){
         sojowanie_urzednikow(urzednicy[i]);
@@ -388,9 +390,9 @@ void zamykanie(){
         }
     }
 
-    while(sem_p(semid, SEM_MUTEX));
+    sem_p_mutex(semid);
     shm->koniec_pracy = 3;   //Zamknięcie Biletomatów
-    while(sem_v(semid, SEM_MUTEX));
+    sem_v_mutex(semid);
 
     while (wait(NULL) > 0); 
 
