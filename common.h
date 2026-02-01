@@ -10,29 +10,30 @@
 #include <sys/sem.h> 
 #include <sys/msg.h>
 #include <sys/time.h> 
+#include <sys/resource.h>
 #include <signal.h> 
 #include <errno.h> 
 #include <time.h> 
 #include <string.h> 
 #include <sys/wait.h>
 
-#define MAX_PETENTOW_W_BUDYNKU (2000)
+#define MAX_PETENTOW_W_BUDYNKU (1000)
 #define PROG_URUCHOMIENIA_KAS (750)
 #define CZAS_DO_OTWARCIA (5) //Tp
-#define CZAS_PRACY (4) //Tk-Tp
+#define CZAS_PRACY (10) //Tk-Tp
 #define CZAS_PO_ZAMKNIECIU (0) //Domślnie 2 minuty wedle założeń projektu
-#define MAX_PROCESOW_PETENTOW (MAX_PETENTOW_W_BUDYNKU * 2) //Będzie przydatne do ograniczenia petentów w generatorze
+#define MAX_PROCESOW_PETENTOW (10000) //Będzie przydatne do ograniczenia petentów w generatorze
+
 #define LIMIT_OSIAGNIETY (-1) //Stała do msgqueue dla czytelności 
 #define POWROT_Z_KASY (-2) //Stała do msgqueue
 #define KONIEC_OBSLUGI (-3) //Stała do msgqueue
 
 //Limity wydziałow:
-#define LIMIT_SA (2000)
-#define LIMIT_SC (500)
-#define LIMIT_KM (500)
-#define LIMIT_ML (500)
-#define LIMIT_PD (500)
-#define LIMIT_KASA (999999999)
+#define LIMIT_SA (6000)
+#define LIMIT_SC (1000)
+#define LIMIT_KM (1000)
+#define LIMIT_ML (1000)
+#define LIMIT_PD (1000)
 #define MAX_BILETOW (LIMIT_SA + LIMIT_SC + LIMIT_KM + LIMIT_ML +LIMIT_PD)
 
 //Identyfikatory wydziałow i kasy - przyda się do obsługi p[etenta]

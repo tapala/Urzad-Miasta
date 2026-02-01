@@ -9,6 +9,7 @@ pid_t generator_pid;
 pid_t urzednicy[6];
 
 void signal_handler(int sig);
+void input_validation();
 void init_ipc(void);
 void run_urzednik(int dept, int offset);
 void cleanup(void);
@@ -17,7 +18,7 @@ void generator();
 void zamykanie();
 
 int main(){
-
+    input_validation();
     init_signals();
 
     if (signal(SIGINT, signal_handler) == SIG_ERR || signal(SIGRTMIN, signal_handler) == SIG_ERR || signal(SIGUSR2, signal_handler) == SIG_ERR){
@@ -217,7 +218,7 @@ void init_ipc() {
     shm->limity_przyjec[DEPT_KM] = LIMIT_KM;
     shm->limity_przyjec[DEPT_ML] = LIMIT_ML;
     shm->limity_przyjec[DEPT_PD] = LIMIT_PD;
-    shm->limity_przyjec[DEPT_KASA] = LIMIT_KASA;                                            //Dodane w celu testowania - jak się będzie psuć to do wywalenia
+    shm->limity_przyjec[DEPT_KASA] = 999999999;
     shm->limity_przyjec_sum = MAX_BILETOW;
 
     //Zerujemy wartości
@@ -401,4 +402,41 @@ void zamykanie(){
 
     //Czekam na dziecki
     while (wait(NULL) > 0); 
+}
+
+void input_validation(){
+    struct rlimit rlim;
+    
+    if (getrlimit(RLIMIT_NPROC, &rlim) == -1) {
+        perror("getrlimit");
+        return;
+    }
+    int r = (rlim.rlim_cur * 7) / 10;
+    if(MAX_PROCESOW_PETENTOW > r){
+        printf("Za duży ustawiony limit procesów - MAX_PROCESOW_PETENTOW (ponad %d)\n", r);
+        fflush(stdout);
+        exit(1);
+    }
+    if(MAX_PETENTOW_W_BUDYNKU < 2 || MAX_PROCESOW_PETENTOW < 10){
+        printf("Zbyt niska MAX_PETENTOW_W_BUDYNKU lub MAX_PROCESOW_PETENTOW\n");
+        fflush(stdout);
+    }
+    if((MAX_PETENTOW_W_BUDYNKU/3) > PROG_URUCHOMIENIA_KAS){
+        printf("Zbyt niski PROG_URUCHOMIENIA_KAS względem MAX_PETENTOW_W_BUDYNKU\n");
+        fflush(stdout);
+        exit(1);
+    }
+    if(CZAS_PRACY < 5){
+        printf("Zbyt krótki CZAS_PRACY\n");
+        fflush(stdout);
+        exit(1);
+    }
+    if(CZAS_DO_OTWARCIA < 0 || CZAS_PO_ZAMKNIECIU < 0 || LIMIT_SA < 0 || LIMIT_SC < 0 || LIMIT_KM < 0 || LIMIT_ML < 0 || LIMIT_PD < 0){
+        printf("[UWAGA] CZAS_DO_OTWARCIA, CZAS_PO_ZAMKNIECIU lub któryś z LIMIT'ów jest poniżej 0 \n");
+        fflush(stdout);
+    }
+    if(MAX_PETENTOW_W_BUDYNKU > MAX_PETENTOW_W_BUDYNKU){
+        printf("[UWAGA] więcej MAX_PETENTOW_W_BUDYNKU niż w bufferze MAX_PETENTOW_W_BUDYNKU\n");
+        fflush(stdout);
+    }
 }
