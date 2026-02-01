@@ -10,6 +10,7 @@ void czysciciel();
 
 int typ_wydzialu, monitor_offset,shmid, semid, msg_urzad, msg_urzad_back, queue_id, queue_back_id, obsluzeni;
 int close_flag = 0;
+int stop_queue_clear = 0;
 int sa_zamkiete = 0;
 volatile int sigflag = 0;
 
@@ -20,7 +21,7 @@ SharedData *shm;
 Komunikat msg;
 int main(int argc, char **argv) {
 
-    if(signal(SIGUSR1, signal_handler) == SIG_ERR || signal(SIGRTMIN, signal_handler) == SIG_ERR){
+    if(signal(SIGUSR1, signal_handler) == SIG_ERR || signal(SIGRTMIN, signal_handler) == SIG_ERR || signal(SIGUSR2, signal_handler) == SIG_ERR){
         perror("signal urzednik");
         exit(1);
     }
@@ -32,7 +33,7 @@ int main(int argc, char **argv) {
     srand(seed);
     init_signals();
 
-    semid = semget(ftok_handler(FTOK_PATH, ID_SEM), 6, 0600);
+    semid = semget(ftok_handler(FTOK_PATH, ID_SEM), 7, 0600);
     if(semid == -1){
         perror("semget urzednik");
     }
@@ -48,18 +49,18 @@ int main(int argc, char **argv) {
 
     shmid = shmget(ftok_handler(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600);
     mshmid = shmget(ftok_handler(FTOK_PATH, ID_SHM_MONITOR), sizeof(MonitorData), 0600);
-    if(shmid == -1 || mshmid){
+    if(shmid == -1 || mshmid == -1){
         perror("shmget urzednik");
     }
 
     shm = (SharedData*)shmat(shmid, NULL, 0);
     if(shm == (void*)-1){
-        perror("shmget biletomat shm");
+        perror("shmat biletomat shm");
         exit(1);
     }
     mshm = (MonitorData*)shmat(mshmid, NULL, 0);
     if(mshm == (void*)-1){
-        perror("shmget biletomat mshm");
+        perror("shmat biletomat mshm");
         exit(1);
     }
 
@@ -73,6 +74,9 @@ void signal_handler(int sig){
     }
     else if(sig == SIGUSR1){
         director_shutdown();
+    }
+    else if(sig == SIGUSR2){
+        stop_queue_clear = 1;
     }
 }
 
@@ -344,12 +348,9 @@ void director_shutdown(){
 }
 
 void empty_msgqueue(){
-    while(1){
-        if (msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), -3, IPC_NOWAIT) == -1){
-            if (errno == ENOMSG) {
-                break;
-            } 
-            else if(errno == EINTR){
+    while(stop_queue_clear){
+        if (msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), -3, 0) == -1){
+            if(errno == EINTR){
                 continue;
             }
             else if(errno){

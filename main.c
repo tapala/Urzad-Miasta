@@ -13,7 +13,7 @@ void input_validation();
 void init_ipc(void);
 void run_urzednik(int dept, int offset);
 void cleanup(void);
-void sojowanie_urzednikow(pid_t pidus_amogus_susus_impostorus);
+void sojowanie_urzednikow(pid_t pidus_amogus_susus_impostorus, int type);
 void generator();
 void zamykanie();
 
@@ -321,9 +321,16 @@ void signal_handler(int sig) {
     }
 }
 
-void sojowanie_urzednikow(pid_t pidus_amogus_susus_impostorus){
-    if(kill(pidus_amogus_susus_impostorus, SIGUSR1) == -1){
-            perror("kill sojowanie SIGUSR1");
+void sojowanie_urzednikow(pid_t pidus_amogus_susus_impostorus, int type){
+    if(type == 1){
+        if(kill(pidus_amogus_susus_impostorus, SIGUSR1) == -1){
+                perror("kill sojowanie SIGUSR1");
+        }
+    }
+    else{
+        if(kill(pidus_amogus_susus_impostorus, SIGUSR2) == -1){
+                perror("kill sojowanie SIGUSR1");
+        }
     }
 }
 
@@ -364,6 +371,9 @@ void generator(){
             }
         }
         while(wait(NULL)>0);
+        for(int i=0; i<7; i++){
+            sojowanie_urzednikow(urzednicy[i], 2);
+        }
         while(sem_v(semid, SEM_LOCK_REGISTER));
         exit(0);
     }
@@ -378,7 +388,7 @@ void zamykanie(){
     sem_v_mutex(semid);
 
     for(int i=0; i<7; i++){
-        sojowanie_urzednikow(urzednicy[i]);
+        sojowanie_urzednikow(urzednicy[i], 1);
     }
 
     // Zabij generator jeśli jeszcze działa
@@ -426,7 +436,7 @@ void input_validation(){
         fflush(stdout);
         exit(1);
     }
-    if(CZAS_PRACY < 3){
+    if(CZAS_PRACY < 5){
         printf("Zbyt krótki CZAS_PRACY\n");
         fflush(stdout);
         exit(1);
