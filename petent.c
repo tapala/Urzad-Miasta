@@ -26,20 +26,52 @@ void sem_p_mutex();
 void sem_v_mutex();
 
 int main(int argc, char** argv) {
-    signal(SIGRTMIN, kys);
-    atexit(atexit_action);
+    if(signal(SIGRTMIN, kys) == SIG_ERR){
+        perror("signal petent");
+    }
+    if(atexit(atexit_action)){
+        perror("atexit petent");
+        while(sem_v(semid, SEM_PETENCI));
+        exit(1);
+    }
     unsigned int seed = time(NULL) ^ (getpid() << 16);
     srand(seed);
     cel = atoi(argv[1]);
     set_queue_id();
     // Inicjalizacja handlerów pamięci współdzielonej i kolejki komunikatów
-    shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
+    shmid = shmget(ftok_handler(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
+    if(shmid == -1){
+        perror("shmget petent");
+        exit(1);
+    }
 
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 6, 0);
-    msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0);
-    msg_bilet_back_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0);
-    msg_urzad_id = msgget(ftok(FTOK_PATH, queue_id), 0);
-    msg_urzad_back_id = msgget(ftok(FTOK_PATH, queue_back_id), 0600);
+    semid = semget(ftok_handler(FTOK_PATH, ID_SEM), 6, 0);
+    if(semid == -1){
+        perror("semget petent");
+        exit(1);
+    }
+
+    msg_bilet_id = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET), 0);
+    msg_bilet_back_id = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET_BACK), 0);
+    msg_urzad_id = msgget(ftok_handler(FTOK_PATH, queue_id), 0);
+    msg_urzad_back_id = msgget(ftok_handler(FTOK_PATH, queue_back_id), 0600);
+
+    if(msg_bilet_id == -1){
+        fprintf(stderr,"%s - msgget bilet; cel = %d - %s => %d \n", strerror(errno), cel,__FILE__,__LINE__);
+        exit(1);
+    }
+    if(msg_bilet_back_id == -1){
+        fprintf(stderr,"%s - msgget bilet back; cel = %d - %s => %d \n", strerror(errno), cel,__FILE__,__LINE__);
+        exit(1);
+    }
+    if(msg_urzad_id == -1){
+        fprintf(stderr,"%s - msgget urzad; cel = %d - %s => %d \n", strerror(errno), cel,__FILE__,__LINE__);
+        exit(1);
+    }
+    if(msg_urzad_back_id == -1){
+        fprintf(stderr,"%s - msgget urzad back; cel = %d - %s => %d \n", strerror(errno), cel,__FILE__,__LINE__);
+        exit(1);
+    }
 
     petent_loop();
 
@@ -56,12 +88,14 @@ void* opiekun_thread(void *arg)
 
     // Wysłanie żądania biletu
     if(msgsnd(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
-        fprintf(stderr,"%s - Wyjebka na msgsnd - Rejestracja - %s => %d \n", strerror(errno), __FILE__,__LINE__);
+        if(errno != EINTR)
+            fprintf(stderr,"%s - Wyjebka na msgsnd - Rejestracja - %s => %d \n", strerror(errno), __FILE__,__LINE__);
     }
 
     // Odebranie biletu adresowanego do PID petenta
     if(msgrcv(msg_bilet_back_id, &msg, sizeof(Komunikat) - sizeof(long), msg.pid_petenta, 0) == -1){
-        fprintf(stderr,"%s - Wyjebka na msgrcv - Rejestracja - %s => %d \n", strerror(errno), __FILE__,__LINE__);
+        if(errno != EINTR)
+            fprintf(stderr,"%s - Wyjebka na msgrcv - Rejestracja - %s => %d \n", strerror(errno), __FILE__,__LINE__);
     }
 
     if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
@@ -166,14 +200,18 @@ void petent_loop() {
 
         // Komunikat wysyłamy do do biletomatu...
         if(msgsnd(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
-            fprintf(stderr,"%s -- %d -- Wyjebka na msgsend - Rejestracja - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
-            kys();
+            if(errno != EINTR){
+                fprintf(stderr,"%s -- %d -- Wyjebka na msgsend - Rejestracja - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+                kys();
+            }
         }
 
         // ...po czym pobieramy komunikat zwrotny...
         if(msgrcv(msg_bilet_back_id, &msg, sizeof(Komunikat) - sizeof(long), my_pid, 0) == -1){
-            fprintf(stderr,"%s -- %d -- Wyjebka na msgrcv - Rejestracja - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
-            kys();
+            if(errno != EINTR){
+                fprintf(stderr,"%s -- %d -- Wyjebka na msgrcv - Rejestracja - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+                kys();
+            }
         }
 
         if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
@@ -215,14 +253,18 @@ void petent_loop() {
         
 
         if(msgsnd(msg_urzad_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
-            fprintf(stderr,"%s -- %d -- Wyjebka na msgsend - Urzednik - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
-            kys();
+            if(errno != EINTR){
+                fprintf(stderr,"%s -- %d -- Wyjebka na msgsend - Urzednik - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+                break;
+            }
         }
 
         // Jeśli komunikat się nie powiedzie to przerywamy pętlę
         if (msgrcv(msg_urzad_back_id, &msg, sizeof(Komunikat) - sizeof(long), my_pid, 0) == -1){
-            fprintf(stderr,"%s -- %d -- Wyjebka na msgrcv - Urzednik - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
-            break;
+            if(errno != EINTR){
+                fprintf(stderr,"%s -- %d -- Wyjebka na msgrcv - Urzednik - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+                break;
+            }
         }
         // Jeśli urzędnik zwróci wartość odpowiadającą załatwienie sprawy to przerywamy pętlę
         if (msg.typ_sprawy == 0)
@@ -244,22 +286,35 @@ void petent_loop() {
         else{
             cel = msg.typ_sprawy;
             set_queue_id();
-            msg_urzad_id = msgget(ftok(FTOK_PATH, queue_id), 0);
-            msg_urzad_back_id = msgget(ftok(FTOK_PATH, queue_back_id), 0);
+            msg_urzad_id = msgget(ftok_handler(FTOK_PATH, queue_id), 0);
+            msg_urzad_back_id = msgget(ftok_handler(FTOK_PATH, queue_back_id), 0);
+            if(msg_bilet_id == -1){
+                fprintf(stderr,"%s - msgget zwrotka - %s => %d \n", strerror(errno), __FILE__,__LINE__);
+                exit(1);
+            }
+            if(msg_urzad_back_id == -1){
+                fprintf(stderr,"%s - msgget zwrotka back - %s => %d \n", strerror(errno), __FILE__,__LINE__);
+                exit(1);
+            }
         }
     }
 
     // Petent obsłużony wychodzi z budynku
 
-    sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0);
+    while(sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0));
 
-    shmdt(shm);
+    if(shmdt(shm) == -1){
+        perror("shmdt");
+    }
+    exit(0);
 }
 
 void kys(){
-    sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0);
-    shmdt(shm);
-    exit(1);
+    while(sem_op(semid, SEM_BUDYNEK, zajmowane_miejsca, 0));
+    if(shmdt(shm) == -1){
+        perror("shmdt");
+    }
+    exit(0);
 }
 
 void set_queue_id(){
@@ -309,10 +364,10 @@ void restore_signal(void) {
 
 void sem_p_mutex() {
     block_signal();
-    sem_p(semid, SEM_MUTEX);
+    while(sem_p(semid, SEM_MUTEX));
 }
 
 void sem_v_mutex() {
-    sem_v(semid, SEM_MUTEX);
+    while(sem_v(semid, SEM_MUTEX));
     restore_signal();
 }

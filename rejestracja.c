@@ -16,6 +16,11 @@ void signal_handler(int sig);
 void biletomat_loop(){
     int msg_id = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET), 0);
     int msg_back_id = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET_BACK), 0);
+    if(msg_id == -1 || msg_back_id == -1){
+        perror("msget biletomat");
+        exit(1);
+    }
+
     Komunikat msg;
 
     while (run_flag) {
@@ -165,7 +170,7 @@ int main() {
 
     while (wait(NULL) > 0); 
     if(shmdt(shm))
-        perror("shmdt biletomat")
+        perror("shmdt biletomat");
     printf("[REJESTRACJA] Zamykanie systemu biletowego\n");
     return 0;
 }
