@@ -276,24 +276,6 @@ void cleanup() {
     msgctl_IPC_RMID_handler(msg_bilet_id);
     msgctl_IPC_RMID_handler(msg_bilet_back_id);
 
-    msgctl_IPC_RMID_handler(msg_urzad_SA_id);
-    msgctl_IPC_RMID_handler(msg_urzad_SA_back_id);
-
-    msgctl_IPC_RMID_handler(msg_urzad_SC_id);
-    msgctl_IPC_RMID_handler(msg_urzad_SC_back_id);
-
-    msgctl_IPC_RMID_handler(msg_urzad_KM_id);
-    msgctl_IPC_RMID_handler(msg_urzad_KM_back_id);
-
-    msgctl_IPC_RMID_handler(msg_urzad_ML_id);
-    msgctl_IPC_RMID_handler(msg_urzad_ML_back_id);
-    
-    msgctl_IPC_RMID_handler(msg_urzad_PD_id);
-    msgctl_IPC_RMID_handler(msg_urzad_PD_back_id);   
-
-    msgctl_IPC_RMID_handler(msg_urzad_KASA_id);
-    msgctl_IPC_RMID_handler(msg_urzad_KASA_back_id);
-
     // czekamy na wszystkie dzieciaczki
     while (wait(NULL) > 0);
 }
@@ -340,6 +322,7 @@ void generator(){
             perror("signal generator");
             exit(1);
         }
+        init_signals();
         while (1) {                                                     //Generator pracuje do zamknięcia urzędu
             //Generator pracuje do zamknięcia urzędu
             if (generator_stop_flag) break;
@@ -436,7 +419,7 @@ void input_validation(){
         fflush(stdout);
         exit(1);
     }
-    if(CZAS_PRACY < 5){
+    if(CZAS_PRACY < -1000){
         printf("Zbyt krótki CZAS_PRACY\n");
         fflush(stdout);
         exit(1);

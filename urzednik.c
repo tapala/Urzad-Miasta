@@ -166,19 +166,6 @@ void start_urzednik() {
         int stan = shm->koniec_pracy;
         sem_v_mutex(semid);
 
-        // Ewakuacja natychmiastowa
-        if (stan > 0){
-            sem_p_mutex(semid);
-            if (!(shm->sa_zamkiete)){
-                shm->sa_zamkiete = 1;
-            }
-            else{
-                sa_zamkiete = 1;
-            }
-            sem_v_mutex(semid);
-            break;
-        }   
-
         if(msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), -3, 0) == -1){
             if(errno == EINTR){
                 if(!sigflag)
@@ -317,6 +304,8 @@ void start_urzednik() {
         msgctl_IPC_RMID_handler(msg_urzad_back);
     }
 
+    sprintf(log_buf, "[URZEDNIK %d] Koniec - obsluzeni: %d\n", typ_wydzialu, obsluzeni);
+    log_to_file(log_buf, semid);
     printf("\033[33m[URZEDNIK %d] Koniec - obsluzeni: %d\033[m\n",typ_wydzialu, obsluzeni);
     // Odłączenie pamięci współdzielonej po zakończeniu loopa - ewakuacja
     
@@ -328,8 +317,8 @@ void start_urzednik() {
 
 void director_shutdown(){
     if (typ_wydzialu == DEPT_SA){
-        sa_zamkiete = shm->sa_zamkiete;
         sem_p_mutex(semid);
+        sa_zamkiete = shm->sa_zamkiete;
         if(sa_zamkiete){
             shm->limity_przyjec_sum -= shm->limity_przyjec[typ_wydzialu];
             shm->limity_przyjec[typ_wydzialu] = 0;

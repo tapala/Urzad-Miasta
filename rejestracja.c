@@ -79,6 +79,7 @@ void uruchom_biletomat(){
             perror("signal biletomat");
             return;
         }
+        init_signals();
         biletomat_loop();
         exit(0);
     }

@@ -82,7 +82,7 @@ void msgctl_IPC_RMID_handler(int msqid){
 
 void init_signals(void) {
     sigemptyset(&new_sigset);
-    sigaddset(&new_sigset, SIGRTMIN);
+    sigfillset(&new_sigset);
 }
 
 void block_signal(void) {

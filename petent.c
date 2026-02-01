@@ -303,7 +303,11 @@ void petent_loop() {
         
 
         if(msgsnd(msg_urzad_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
-            if(errno != EINTR){
+            if(errno == EIDRM || errno == EINVAL){
+                printf("\033[42m\033[37m[PETENT %d] Urzędnik się zamknął zanim wszedłem do jego kolejki \033[m\n", my_pid);
+                break;
+            }
+            else if(errno != EINTR){
                 fprintf(stderr,"%s -- %d -- Wyjebka na msgsend - Urzednik - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
                 break;
             }
