@@ -21,34 +21,18 @@ int sem_op(int semid, int sem_num, int op, short flag) {
 int sem_p(int semid, int sem_num) { return sem_op(semid, sem_num, -1, 0); } 
 int sem_v(int semid, int sem_num) { return sem_op(semid, sem_num, 1, 0); }
 
-int semt_op(int semid, int sem_num, int op, long nanotime) { 
-    struct sembuf s; 
-    s.sem_num = sem_num; 
-    s.sem_op = op; 
-    s.sem_flg = 0; 
-    struct timespec t;
-    t.tv_sec = 0;
-    t.tv_nsec = nanotime;
-    if (semtimedop(semid, &s, 1, &t) == -1){
-        if(errno == EAGAIN)
-            return -1;
-        if (errno != EIDRM && errno != EINVAL) {
-            perror("semop");
-            exit(1);
-        }
-    }
-    return 0;
-} 
-int semt_p(int semid, int sem_num, long nanotime) { return semt_op(semid, sem_num, -1, nanotime); } 
-int semt_v(int semid, int sem_num, long nanotime) { return semt_op(semid, sem_num, 1, nanotime); }
-// Logowanie do pliku
 void log_to_file(const char *msg, int semid) {
-    sem_p(semid, SEM_LOG_MUTEX); 
+    while(sem_p(semid, SEM_LOG_MUTEX)); 
     FILE *f = fopen("raport.txt", "a"); 
     if (f) { 
         fprintf(f, "%s", msg); 
         fclose(f); 
     } 
+    else{
+        while(sem_v(semid, SEM_LOG_MUTEX)); 
+        perror("fopen");
+        exit(1);
+    }
     sem_v(semid, SEM_LOG_MUTEX); 
 }
 
@@ -58,5 +42,38 @@ void gotowanie_procesora(int seconds){
         time_t now = time(NULL);
         if((now - start) >= seconds)
             break;
+    }
+}
+
+key_t ftok_handler(const char *path, int proj_id){
+    key_t result = ftok(path, proj_id);
+    if(result == -1){
+        perror("ftok");
+        exit(1);
+    }
+    return result;
+}
+
+int msgget_CREATE_handler(const char *path, int proj_id){
+    int result = msgget(ftok_handler(path, proj_id), 0600 | IPC_CREAT);
+    if(result == -1){
+        perror("msgget");
+        exit(1);
+    }
+    return result;
+}
+
+void semctl_SETVAL_handler(int semid, int sem_name,int value){
+    if(semctl(semid, sem_name, SETVAL, value) == -1){
+        perror("semctl SETVAL");
+        exit(1);
+    }
+
+}
+
+void msgctl_IPC_RMID_handler(int msqid){
+    if(msgctl(msqid, IPC_RMID, NULL) == -1){
+        perror("msgctl IPC_RMID");
+        exit(1);
     }
 }
