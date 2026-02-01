@@ -26,17 +26,30 @@ void sem_p_mutex();
 void sem_v_mutex();
 
 int main(int argc, char** argv) {
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <cel>\n", argv[0]);
+        exit(1);
+    }
+
+    cel = atoi(argv[1]);
+
+    if (cel <= 0) {
+        fprintf(stderr, "Invalid cel value: %s\n", argv[1]);
+        exit(1);
+    }
+
     if(signal(SIGRTMIN, kys) == SIG_ERR){
         perror("signal petent");
     }
+
     if(atexit(atexit_action)){
         perror("atexit petent");
         while(sem_v(semid, SEM_PETENCI));
         exit(1);
     }
+
     unsigned int seed = time(NULL) ^ (getpid() << 16);
     srand(seed);
-    cel = atoi(argv[1]);
     set_queue_id();
     // Inicjalizacja handlerów pamięci współdzielonej i kolejki komunikatów
     shmid = shmget(ftok_handler(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
@@ -81,6 +94,7 @@ int main(int argc, char** argv) {
 void* opiekun_thread(void *arg)
 {
     (void)arg;
+    int ret;
     // Wejście do kolejki biletowej
     sem_p_mutex();
     shm->kolejka_do_biletow++;
@@ -108,10 +122,20 @@ void* opiekun_thread(void *arg)
     }
 
     // Informacja dla dziecka - wręczenie biletu
-    pthread_mutex_lock(&mtx);
+    ret = pthread_mutex_lock(&mtx);
+    if (ret) {
+        perror("pthread_mutex_lock");
+        return NULL;
+    }
     bilet_gotowy = 1;
-    pthread_cond_signal(&cond);
-    pthread_mutex_unlock(&mtx);
+    ret = pthread_cond_signal(&cond);
+    if(ret) {
+        fprintf(stderr, "pthread_cond_signal - wywrotka: %s\n", strerror(ret));
+    }
+    ret = pthread_mutex_unlock(&mtx);
+    if(ret) {
+        fprintf(stderr, "pthread_mutex_unlock - wywrotka: %s\n", strerror(ret));
+    }
 
     return NULL;
 }
@@ -120,6 +144,10 @@ void petent_loop() {
 
     // Pamięć współdzielona
     shm = (SharedData*)shmat(shmid, NULL, 0);
+    if (shm == (void*)-1) {
+        perror("shmat petent");
+        exit(1);
+    }
 
     // Ustawiamy/losujemy początkowe dane
     my_pid = getpid();
@@ -178,18 +206,40 @@ void petent_loop() {
     // Jeśli dziecko -> odpal wątek opiekuna
     if (wiek < 18) {
 
+        int ret;
         pthread_t th;
-        pthread_create(&th, NULL, opiekun_thread, NULL);
+        ret = pthread_create(&th, NULL, opiekun_thread, NULL);
+        if(ret){
+            fprintf(stderr, "pthread_create - wywrotka: %s\n", strerror(ret));
+            kys();
+        }
 
         // Dziecko czeka na rodzica z biletem
-        pthread_mutex_lock(&mtx);
+        ret = pthread_mutex_lock(&mtx);
+        if(ret){
+            fprintf(stderr, "pthread_mutex_lock - wywrotka: %s\n", strerror(ret));
+            kys();
+        }
 
-        while (!bilet_gotowy)
-            pthread_cond_wait(&cond, &mtx);
+        while (!bilet_gotowy){
+            ret = pthread_cond_wait(&cond, &mtx);
+            if(ret){
+                fprintf(stderr, "pthread_cond_wait - wywrotka: %s\n", strerror(ret));
+                pthread_mutex_unlock(&mtx);
+                kys();
+            }
+        }
 
-        pthread_mutex_unlock(&mtx);
+        ret = pthread_mutex_unlock(&mtx);
+        if(ret){
+            fprintf(stderr, "pthread_mutex_unlock - wywrotka: %s\n", strerror(ret));
+        }
 
-        pthread_join(th, NULL);
+        ret = pthread_join(th, NULL);
+        if(ret){
+            fprintf(stderr, "pthread_join - wywrotka: %s\n", strerror(ret));
+            kys();
+        }
     }
     // Dorosły działa jak wcześniej
     else {
