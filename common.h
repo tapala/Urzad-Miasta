@@ -19,19 +19,19 @@
 #define MAX_PETENTOW_W_BUDYNKU (2000)
 #define PROG_URUCHOMIENIA_KAS (750)
 #define CZAS_DO_OTWARCIA (5) //Tp
-#define CZAS_PRACY (30) //Tk-Tp
+#define CZAS_PRACY (4) //Tk-Tp
 #define CZAS_PO_ZAMKNIECIU (0) //Domślnie 2 minuty wedle założeń projektu
-#define MAX_PROCESOW_PETENTOW (3000) //Będzie przydatne do ograniczenia petentów w generatorze
+#define MAX_PROCESOW_PETENTOW (MAX_PETENTOW_W_BUDYNKU * 2) //Będzie przydatne do ograniczenia petentów w generatorze
 #define LIMIT_OSIAGNIETY (-1) //Stała do msgqueue dla czytelności 
 #define POWROT_Z_KASY (-2) //Stała do msgqueue
 #define KONIEC_OBSLUGI (-3) //Stała do msgqueue
 
 //Limity wydziałow:
-#define LIMIT_SA (6000)
-#define LIMIT_SC (1000)
-#define LIMIT_KM (1000)
-#define LIMIT_ML (1000)
-#define LIMIT_PD (1000)
+#define LIMIT_SA (2000)
+#define LIMIT_SC (500)
+#define LIMIT_KM (500)
+#define LIMIT_ML (500)
+#define LIMIT_PD (500)
 #define LIMIT_KASA (999999999)
 #define MAX_BILETOW (LIMIT_SA + LIMIT_SC + LIMIT_KM + LIMIT_ML +LIMIT_PD)
 
@@ -49,9 +49,6 @@
 #define ID_SEM (10) //Teblica Semaforów
 #define ID_MSG_BILET (11) //Kolejka Komunikatów - Penent(lub SA) => Biletomat
 #define ID_MSG_BILET_BACK (12) //Kolejka Komunikatów - Petent <= Biletomat
-
-#define ID_MSG_URZAD (13) //Kolejka Kpnikatów - Petent => Urzędnik
-#define ID_MSG_URZAD_BACK (14) //Kolejka Kpnikatów - Petent <= Urzędnik
 
 #define ID_MSG_URZAD_SA (13) //Kolejka Kpnikatów - Petent => Urzędnik
 #define ID_MSG_URZAD_SA_BACK (14) //Kolejka Kpnikatów - Petent <= Urzędnik
@@ -88,7 +85,6 @@ typedef struct {
     int limity_przyjec_sum;
     int koniec_pracy; // 0 - Zakład pracuje, 1 - Zamknięcie(po CZAS_PRACY), 2 - Ewakuacja 
     int sa_zamkiete;
-    int brak_petentow;
 } SharedData;
 
 typedef struct { 
@@ -116,8 +112,9 @@ void log_to_file(const char *msg, int semid);
 int sem_p(int semid, int sem_num); 
 int sem_v(int semid, int sem_num); 
 int sem_op(int semid, int sem_num, int op, short flag);
-int semt_p(int semid, int sem_num, long nanotime); 
-int semt_v(int semid, int sem_num, long nanotime); 
-int semt_op(int semid, int sem_num, int op, long nanotime);
 void gotowanie_procesora(int seconds);
+key_t ftok_handler(const char *path, int proj_id);
+int msgget_CREATE_handler(const char *path, int proj_id);
+void semctl_SETVAL_handler(int semid, int sem_name,int value);
+void msgctl_IPC_RMID_handler(int msqid);
 #endif

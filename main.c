@@ -163,21 +163,21 @@ void init_ipc() {
     shmid = shmget(ftok_handler(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600 | IPC_CREAT);
     mshmid = shmget(ftok_handler(FTOK_PATH, ID_SHM_MONITOR), sizeof(MonitorData), 0600 | IPC_CREAT);
     if(shmid == -1|| mshmid == -1){
-        perror("shmget");
+        perror("shmget main");
         exit(1);
     }
     
     shm = (SharedData*)shmat(shmid, NULL, 0);
     mshm = (MonitorData*)shmat(mshmid, NULL, 0);
     if(shm == (void*)-1|| mshm == (void*)-1){
-        perror("shmget");
+        perror("shmget main");
         exit(1);
     }
 
     //Utworzenie tablicy 3 semaforów i przypisanie im wstępnych wartości
     semid = semget(ftok_handler(FTOK_PATH, ID_SEM), 6, 0600 | IPC_CREAT);
     if(semid == -1){
-        perror("semget");
+        perror("semget main");
         exit(1);
     }
     semctl_SETVAL_handler(semid, SEM_MUTEX, 1);
@@ -245,11 +245,17 @@ void run_urzednik(int dept, int offset) {
 void cleanup() {
 
     //Odłączenie pamięci
-    if (shm != NULL)
-        shmdt(shm);
+    if (shm != NULL){
+        if(shmdt(shm)){
+            perror("shmdt shm main");
+        }
+    }
 
-    if (mshm != NULL)
-        shmdt(mshm);
+    if (mshm != NULL){
+        if(shmdt(mshm)){
+            perror("shmdt mshm main");
+        }
+    }
 
     if(shmctl(mshmid, IPC_RMID, NULL) == -1){
         perror("shmctl IPC_RMID mshmid");
@@ -300,7 +306,9 @@ void signal_handler(int sig) {
     }
     else if(sig == SIGUSR2){
         if(generator_pid){
-            kill(0, SIGRTMIN);
+            if(kill(0, SIGRTMIN) == -1){
+                perror("kill SIGUSR2");
+            }
         }
     }
     else if(sig == SIGRTMIN){
@@ -312,8 +320,7 @@ void signal_handler(int sig) {
 
 void sojowanie_urzednikow(pid_t pidus_amogus_susus_impostorus){
     if(kill(pidus_amogus_susus_impostorus, SIGUSR1) == -1){
-            perror("kill sojowanie");
-            exit(1);
+            perror("kill sojowanie SIGUSR1");
     }
 }
 

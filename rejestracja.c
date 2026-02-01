@@ -14,8 +14,8 @@ SharedData *shm;
 void signal_handler(int sig);
 
 void biletomat_loop(){
-    int msg_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0);
-    int msg_back_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0);
+    int msg_id = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET), 0);
+    int msg_back_id = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET_BACK), 0);
     Komunikat msg;
 
     while (run_flag) {
@@ -49,6 +49,7 @@ void biletomat_loop(){
             }
             else{
                 fprintf(stderr,"%s -- %d -- Wyjebka na msgsnd - %s => %d \n", strerror(errno), getpid(),__FILE__,__LINE__);
+                exit(1);
             }
         }
     }
@@ -65,16 +66,18 @@ void uruchom_biletomat(){
     printf("OTWIERAM BILETOMAT \n");
     fflush(stdout);
     if (pid == -1){
-        perror("Fork error");
+        perror("fork biletomat");
         return;
     }
     else if (pid == 0) {
-        signal(SIGTERM, signal_handler);
+        if(signal(SIGTERM, signal_handler) == SIG_ERR){
+            perror("signal biletomat");
+            return;
+        }
         biletomat_loop();
         exit(0);
     }
 
-    // Inkrement kas i zapisanie do sigkilla
     kasy[liczba_biletomatow++] = pid;
 }
 
@@ -84,8 +87,11 @@ void zamkni_biletomat() {
         return;
 
     // Dekrement i wczytanie pidu do auto-kasacji
-    pid_t pid = kasy[--liczba_biletomatow];
-    kill(pid, SIGTERM);
+    pid_t pid = kasy[liczba_biletomatow - 1];
+    if(kill(pid, SIGTERM) == -1){
+        perror("kill biletomat");
+    }
+    liczba_biletomatow--;
     waitpid(pid, NULL, 0);
     printf("BILETOMAT ZAMKNIETY \n");
     fflush(stdout);
@@ -93,11 +99,25 @@ void zamkni_biletomat() {
 
 
 int main() {
-    shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 6, 0);
-    signal(SIGRTMIN, signal_handler);
+    shmid = shmget(ftok_handler(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
+    if(shmid == -1){
+        perror("shmget biletomat");
+        exit(1);
+    }
+    semid = semget(ftok_handler(FTOK_PATH, ID_SEM), 6, 0);
+    if(semid == -1){
+        perror("semget biletomat");
+        exit(1);
+    }
+    if(signal(SIGRTMIN, signal_handler) == SIG_ERR){
+        perror("signal biletomat");
+        exit(1);
+    }
     shm = (SharedData*)shmat(shmid, NULL, 0);
-
+    if(shm == (void*)-1){
+        perror("shmget biletomat");
+        exit(1);
+    }
     printf("[REJESTRACJA] System biletowy uruchomiony\n");
 
     while (1) {
@@ -124,11 +144,11 @@ int main() {
         else if (kolejka > PROG_URUCHOMIENIA_KAS) docelowe = 2;
 
         // Histereza(swoją drogą bardzo fajne słówko) kas
-        if (liczba_biletomatow == 3 && kolejka < (2 * N) / 3)
-            docelowe = 2;
 
         if (liczba_biletomatow == 2 && kolejka < K)
             docelowe = 1;
+        else if (liczba_biletomatow == 3 && kolejka < (2 * N) / 3)
+            docelowe = 2;
 
         // Nadgonienie liczby otwartych kas do liczby docelowej
         while (liczba_biletomatow < docelowe)
@@ -144,7 +164,8 @@ int main() {
         zamkni_biletomat();
 
     while (wait(NULL) > 0); 
-    shmdt(shm);
+    if(shmdt(shm))
+        perror("shmdt biletomat")
     printf("[REJESTRACJA] Zamykanie systemu biletowego\n");
     return 0;
 }
