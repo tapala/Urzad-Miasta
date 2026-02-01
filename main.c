@@ -364,7 +364,7 @@ void generator(){
             }
         }
         while(wait(NULL)>0);
-        
+        while(sem_v(semid, SEM_LOCK_REGISTER));
         exit(0);
     }
 }
@@ -381,8 +381,6 @@ void zamykanie(){
         sojowanie_urzednikow(urzednicy[i]);
     }
 
-    while(sem_op(semid, SEM_LOCK_REGISTER, -7, 0));
-
     // Zabij generator jeśli jeszcze działa
     if (generator_pid > 0){
         if(kill(generator_pid, SIGTERM) == -1){
@@ -390,6 +388,8 @@ void zamykanie(){
             exit(1);
         }
     }
+
+    while(sem_op(semid, SEM_LOCK_REGISTER, -8, 0));
 
     sem_p_mutex(semid);
     shm->koniec_pracy = 3;   //Zamknięcie Biletomatów
@@ -426,7 +426,7 @@ void input_validation(){
         fflush(stdout);
         exit(1);
     }
-    if(CZAS_PRACY < 5){
+    if(CZAS_PRACY < 3){
         printf("Zbyt krótki CZAS_PRACY\n");
         fflush(stdout);
         exit(1);

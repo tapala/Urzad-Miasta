@@ -19,23 +19,50 @@ MonitorData *mshm;
 SharedData *shm;
 Komunikat msg;
 int main(int argc, char **argv) {
-    signal(SIGUSR1, signal_handler);
-    signal(SIGRTMIN, signal_handler);
+
+    if(signal(SIGUSR1, signal_handler) == SIG_ERR || signal(SIGRTMIN, signal_handler) == SIG_ERR){
+        perror("signal urzednik");
+        exit(1);
+    }
+
     typ_wydzialu = atoi(argv[1]);
     monitor_offset = atoi(argv[2]);
     set_queue_id();
-
     unsigned int seed = time(NULL) ^ (getpid() << 16);
     srand(seed);
     init_signals();
 
-    shmid = shmget(ftok_handler(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600);
     semid = semget(ftok_handler(FTOK_PATH, ID_SEM), 6, 0600);
+    if(semid == -1){
+        perror("semget urzednik");
+    }
+
     msg_urzad = msgget(ftok_handler(FTOK_PATH, queue_id), 0600);
+    if(msg_urzad == -1){
+        perror("msgget urzednik msg_urzad");
+    }
     msg_urzad_back = msgget(ftok_handler(FTOK_PATH, queue_back_id), 0600);
-    shm = (SharedData*)shmat(shmid, NULL, 0);
+    if(msg_urzad_back == -1){
+        perror("msgget urzednik msg_urzad_back");
+    }
+
+    shmid = shmget(ftok_handler(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600);
     mshmid = shmget(ftok_handler(FTOK_PATH, ID_SHM_MONITOR), sizeof(MonitorData), 0600);
+    if(shmid == -1 || mshmid){
+        perror("shmget urzednik");
+    }
+
+    shm = (SharedData*)shmat(shmid, NULL, 0);
+    if(shm == (void*)-1){
+        perror("shmget biletomat shm");
+        exit(1);
+    }
     mshm = (MonitorData*)shmat(mshmid, NULL, 0);
+    if(mshm == (void*)-1){
+        perror("shmget biletomat mshm");
+        exit(1);
+    }
+
     start_urzednik();
     
 }
@@ -65,7 +92,7 @@ void czysciciel(){
                 }
                 else if(errno){
                     fprintf(stderr,"%s - Wyjebka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
-                    return;
+                    exit(1);
                 }
             }
         }
@@ -79,7 +106,7 @@ void czysciciel(){
                 }
                 else if(errno){
                     fprintf(stderr,"%s - Wyjebka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
-                    return;
+                    exit(1);
                 }
             }
         }
@@ -117,7 +144,11 @@ void start_urzednik() {
     // Inicjalizacja pamięci, semaforów, kolejki komunikatów
     int msg_bilet = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET), 0600);
     int msg_bilet_back = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET_BACK), 0600);
+    if(msg_bilet == -1 || msg_bilet_back == -1){
+        perror("msget biletomat bilet");
+        exit(1);
 
+    }
     // Podstawowy syf
     obsluzeni = 0;
     char log_buf[256];
@@ -282,7 +313,10 @@ void start_urzednik() {
 
     printf("\033[33m[URZEDNIK %d] Koniec - obsluzeni: %d\033[m\n",typ_wydzialu, obsluzeni);
     // Odłączenie pamięci współdzielonej po zakończeniu loopa - ewakuacja
-    shmdt(shm);
+    
+    if(shmdt(shm) == -1){
+        perror("shmdt");
+    }
     while(sem_v(semid, SEM_LOCK_REGISTER));
 }
 
