@@ -17,14 +17,24 @@ int main(){
         exit(1);
     }
 
-    shm = (SharedData*)shmat(shmid, NULL, 0);
-    mshm = (MonitorData*)shmat(mshmid, NULL, 0);
+
+    if ((shm = (SharedData*)shmat(shmid, NULL, 0)) == (void*)-1 || (mshm = (MonitorData*)shmat(mshmid, NULL, 0)) == (void*)-1) {
+        perror("shmat failed");
+        exit(1);
+    }
     semid = semget(ftok(FTOK_PATH, ID_SEM), 6, 0);
     
+    if (semid == -1) {
+        perror("semget failed");
+        exit(1);
+    }
+
     monitor_loop();
 
-    shmdt(shm);
-    shmdt(mshm);
+    if(shmdt(shm) == -1 || shmdt(mshm)){
+        perror("shmdt failed");
+        exit(1);
+    }
     exit(0);
 }
 

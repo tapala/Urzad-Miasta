@@ -14,13 +14,15 @@ void run_urzednik(int dept, int offset);
 void cleanup(void);
 void sojowanie_urzednikow(pid_t pidus_amogus_susus_impostorus);
 void generator();
+void zamykanie();
 
 int main(){
 
-    signal(SIGINT, signal_handler);
-    signal(SIGRTMIN, signal_handler);
-    signal(SIGUSR2, signal_handler);
-    //srand(time(NULL));
+    if (signal(SIGINT, signal_handler) == SIG_ERR || signal(SIGRTMIN, signal_handler) == SIG_ERR || signal(SIGUSR2, signal_handler) == SIG_ERR){
+        perror("signal main");
+        exit(1);
+    }
+
     generator_stop_flag = 0;
     init_ipc();
 
@@ -32,62 +34,99 @@ int main(){
     if (!urzednicy[0]) { 
         run_urzednik(DEPT_SA, 1);
         perror("execl SA");
-        exit(0); 
+        exit(1); 
+    }
+    else if(urzednicy[0] == -1){
+        perror("fork SA");
+        exit(1);
     }
 
     urzednicy[1] = fork();
     if (!urzednicy[1]) { 
         run_urzednik(DEPT_SA, 0);
         perror("execl SA");
-        exit(0); 
+        exit(1); 
+    }
+    else if(urzednicy[1] == -1){
+        perror("fork SA");
+        exit(1);
     }
 
     urzednicy[2] = fork();
     if (!urzednicy[2]) { 
         run_urzednik(DEPT_SC, 0);
         perror("execl SC");
-        exit(0); 
+        exit(1); 
     }
-
+    else if(urzednicy[2] == -1){
+        perror("fork SC");
+        exit(1);
+    }
+    
     urzednicy[3] = fork();
     if (!urzednicy[3]) { 
         run_urzednik(DEPT_KM, 0);
         perror("execl KM");
-        exit(0); 
+        exit(1); 
     }
-
+    else if(urzednicy[3] == -1){
+        perror("fork KM");
+        exit(1);
+    }
+    
     urzednicy[4] = fork();
     if (!urzednicy[4]) { 
         run_urzednik(DEPT_ML, 0);
         perror("execl ML");
-        exit(0); 
+        exit(1); 
     }
-
+    else if(urzednicy[4] == -1){
+        perror("fork ML");
+        exit(1);
+    }
+    
     urzednicy[5] = fork();
     if (!urzednicy[5]) { 
         run_urzednik(DEPT_PD, 0);
         perror("execl PD");
-        exit(0); 
+        exit(1); 
     }
-
+    else if(urzednicy[5] == -1){
+        perror("fork PD");
+        exit(1);
+    }
+    
     urzednicy[6] = fork();
     if (!urzednicy[6]) { 
         run_urzednik(DEPT_KASA, 0);
         perror("execl kasa");
-        exit(0); 
+        exit(1); 
     }
-
+    else if(urzednicy[6] == -1){
+        perror("fork kasa");
+        exit(1);
+    }
+    
 
     //Biletomat:
-    if (!fork()) {
+    int biletomat = fork();
+    if (!biletomat) {
         execl("./rejestracja", "rejestracja", NULL);
         perror("execl rejestracja");
+        exit(1);
+    }
+    else if(biletomat == -1){
+        perror("fork biletomat");
         exit(1);
     }
 
 
     //Generator petentów:
     generator_pid = fork();                                             //Forkujemy mmaina         
+    if(generator_pid == -1){
+        perror("fork generator");
+        exit(1);
+    }
     generator();
 
 
@@ -99,40 +138,11 @@ int main(){
     fflush(stdout);
 
     //Wpuszczamy N osób na semaforze budynku
-    sem_op(semid, SEM_BUDYNEK, MAX_PETENTOW_W_BUDYNKU, 0);
+    while(sem_op(semid, SEM_BUDYNEK, MAX_PETENTOW_W_BUDYNKU, 0));
 
     //Praca do Tk
     gotowanie_procesora(CZAS_PRACY);
-
-    printf("[DYREKTOR] Tk — zamykamy, nowi nie wchodzą.\n");
-    fflush(stdout);
-
-    sem_p(semid, SEM_MUTEX);
-    shm->koniec_pracy = 1;   //Zamknięcie
-    sem_v(semid, SEM_MUTEX);
-
-    for(int i=0; i<7; i++){
-        sojowanie_urzednikow(urzednicy[i]);
-    }
-
-    sem_op(semid, SEM_LOCK_REGISTER, -7, 0);
-
-    // Zabij generator jeśli jeszcze działa
-    if (generator_pid > 0)
-        kill(generator_pid, SIGTERM);
-
-    sem_p(semid, SEM_MUTEX);
-    shm->koniec_pracy = 3;   //Zamknięcie Biletomatów
-    sem_v(semid, SEM_MUTEX);
-
-    while (wait(NULL) > 0); 
-
-    //Funkcja do czyszczena
-    cleanup();
-
-    //Czekam na dziecki
-    while (wait(NULL) > 0); 
-
+    zamykanie();
     return 0;
 }
 
@@ -140,44 +150,64 @@ int main(){
 //Funkcja tworząca cały syf IPC
 void init_ipc() {
     FILE *f = fopen("raport.txt", "w");
-    if (f) { fprintf(f, "--- START SYMULACJI ---\n"); fclose(f); }
+    if (f) { 
+        fprintf(f, "--- START SYMULACJI ---\n"); 
+        fclose(f); 
+    }
+    else{
+        perror("fopen");
+        exit(1);
+    }
 
     //Utworzenie pamięci współdzielonej
-    shmid = shmget(ftok(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600 | IPC_CREAT);
+    shmid = shmget(ftok_handler(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600 | IPC_CREAT);
+    mshmid = shmget(ftok_handler(FTOK_PATH, ID_SHM_MONITOR), sizeof(MonitorData), 0600 | IPC_CREAT);
+    if(shmid == -1|| mshmid == -1){
+        perror("shmget");
+        exit(1);
+    }
+    
     shm = (SharedData*)shmat(shmid, NULL, 0);
-    mshmid = shmget(ftok(FTOK_PATH, ID_SHM_MONITOR), sizeof(MonitorData), 0600 | IPC_CREAT);
     mshm = (MonitorData*)shmat(mshmid, NULL, 0);
+    if(shm == (void*)-1|| mshm == (void*)-1){
+        perror("shmget");
+        exit(1);
+    }
 
     //Utworzenie tablicy 3 semaforów i przypisanie im wstępnych wartości
-    semid = semget(ftok(FTOK_PATH, ID_SEM), 6, 0600 | IPC_CREAT);
-    semctl(semid, SEM_MUTEX, SETVAL, 1);                                                            //Nasz Mutexik
-    semctl(semid, SEM_BUDYNEK, SETVAL, 0);                                                          //Wpuszczanie do budynku
-    semctl(semid, SEM_PETENCI, SETVAL, MAX_PROCESOW_PETENTOW);                                      //Ogranicznik petentów
-    semctl(semid, SEM_LOG_MUTEX, SETVAL, 1);                                                       //Muteks Logi
-    semctl(semid, SEM_LOCK_REGISTER, SETVAL, 0);
-    semctl(semid, SEM_MONITOR_MUTEX, SETVAL, 1);     
+    semid = semget(ftok_handler(FTOK_PATH, ID_SEM), 6, 0600 | IPC_CREAT);
+    if(semid == -1){
+        perror("semget");
+        exit(1);
+    }
+    semctl_SETVAL_handler(semid, SEM_MUTEX, 1);
+    semctl_SETVAL_handler(semid, SEM_BUDYNEK, 0);
+    semctl_SETVAL_handler(semid, SEM_PETENCI, MAX_PROCESOW_PETENTOW);
+    semctl_SETVAL_handler(semid, SEM_LOG_MUTEX, 1);
+    semctl_SETVAL_handler(semid, SEM_LOCK_REGISTER, 0);
+    semctl_SETVAL_handler(semid, SEM_MONITOR_MUTEX, 1) ;                                                 
 
     //Utworzenie kolejek komunikatów
-    msg_bilet_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET), 0600 | IPC_CREAT);
-    msg_bilet_back_id = msgget(ftok(FTOK_PATH, ID_MSG_BILET_BACK), 0600 | IPC_CREAT);
+    msg_bilet_id = msgget_CREATE_handler(FTOK_PATH, ID_MSG_BILET);
+    msg_bilet_back_id = msgget_CREATE_handler(FTOK_PATH, ID_MSG_BILET_BACK);
 
-    msg_urzad_SA_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_SA), 0600 | IPC_CREAT);
-    msg_urzad_SA_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_SA_BACK), 0600 | IPC_CREAT);
+    msg_urzad_SA_id = msgget_CREATE_handler(FTOK_PATH, ID_MSG_URZAD_SA);
+    msg_urzad_SA_back_id = msgget_CREATE_handler(FTOK_PATH, ID_MSG_URZAD_SA_BACK);
 
-    msg_urzad_SC_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_SC), 0600 | IPC_CREAT);
-    msg_urzad_SC_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_SC_BACK), 0600 | IPC_CREAT);
+    msg_urzad_SC_id = msgget_CREATE_handler(FTOK_PATH, ID_MSG_URZAD_SC);
+    msg_urzad_SC_back_id = msgget_CREATE_handler(FTOK_PATH, ID_MSG_URZAD_SC_BACK);
 
-    msg_urzad_KM_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_KM), 0600 | IPC_CREAT);
-    msg_urzad_KM_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_KM_BACK), 0600 | IPC_CREAT);
+    msg_urzad_KM_id = msgget_CREATE_handler(FTOK_PATH, ID_MSG_URZAD_KM);
+    msg_urzad_KM_back_id = msgget_CREATE_handler(FTOK_PATH, ID_MSG_URZAD_KM_BACK);
 
-    msg_urzad_ML_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_ML), 0600 | IPC_CREAT);
-    msg_urzad_ML_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_ML_BACK), 0600 | IPC_CREAT);
+    msg_urzad_ML_id = msgget_CREATE_handler(FTOK_PATH, ID_MSG_URZAD_ML);
+    msg_urzad_ML_back_id = msgget_CREATE_handler(FTOK_PATH, ID_MSG_URZAD_ML_BACK);
 
-    msg_urzad_PD_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_PD), 0600 | IPC_CREAT);
-    msg_urzad_PD_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_PD_BACK), 0600 | IPC_CREAT);
+    msg_urzad_PD_id = msgget_CREATE_handler(FTOK_PATH, ID_MSG_URZAD_PD);
+    msg_urzad_PD_back_id = msgget_CREATE_handler(FTOK_PATH, ID_MSG_URZAD_PD_BACK);
 
-    msg_urzad_KASA_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_KASA), 0600 | IPC_CREAT);
-    msg_urzad_KASA_back_id = msgget(ftok(FTOK_PATH, ID_MSG_URZAD_KASA_BACK), 0600 | IPC_CREAT);
+    msg_urzad_KASA_id = msgget_CREATE_handler(FTOK_PATH, ID_MSG_URZAD_KASA);
+    msg_urzad_KASA_back_id = msgget_CREATE_handler(FTOK_PATH, ID_MSG_URZAD_KASA_BACK);
     
     //Ustawiamy wartości pamięci współdzielonej na nasze stałe
     shm->limity_przyjec[DEPT_SA] = LIMIT_SA;
@@ -192,7 +222,6 @@ void init_ipc() {
     shm->kolejka_do_biletow = 0;
     shm->koniec_pracy = 0;
     shm->sa_zamkiete = 0;
-    shm->brak_petentow = 0;
 
     memset(mshm->obslozeni, 0, sizeof(mshm->obslozeni));
     memset(mshm->vipy, 0, sizeof(mshm->vipy));
@@ -207,7 +236,6 @@ void run_urzednik(int dept, int offset) {
     snprintf(offset_str, sizeof(offset_str), "%d", offset);
 
     execl("./urzednik", "urzednik", dept_str, offset_str, NULL);
-
     perror("execl urzednik");
     exit(1);
 }
@@ -223,34 +251,39 @@ void cleanup() {
     if (mshm != NULL)
         shmdt(mshm);
 
-    shmctl(mshmid, IPC_RMID, NULL);
-    shmctl(shmid, IPC_RMID, NULL);              //Usunięcie segmentu pamięci współ.
-    semctl(semid, 0, IPC_RMID);                 //Usunięcie semaforów
+    if(shmctl(mshmid, IPC_RMID, NULL) == -1){
+        perror("shmctl IPC_RMID mshmid");
+        exit(1);
+    }
+    if(shmctl(shmid, IPC_RMID, NULL) == -1){
+        perror("shmctl IPC_RMID shmid");
+        exit(1);
+    }
+    if(semctl(semid, 0, IPC_RMID) == -1){
+        perror("semctl IPC_RMID");
+        exit(1);
+    }
 
-    msgctl(msg_bilet_id, IPC_RMID, NULL);
-    msgctl(msg_bilet_back_id, IPC_RMID, NULL);
+    msgctl_IPC_RMID_handler(msg_bilet_id);
+    msgctl_IPC_RMID_handler(msg_bilet_back_id);
 
-    msgctl(msg_urzad_SA_id, IPC_RMID, NULL);
-    msgctl(msg_urzad_SA_back_id, IPC_RMID, NULL);
+    msgctl_IPC_RMID_handler(msg_urzad_SA_id);
+    msgctl_IPC_RMID_handler(msg_urzad_SA_back_id);
 
-    msgctl(msg_urzad_SC_id, IPC_RMID, NULL);
-    msgctl(msg_urzad_SC_back_id, IPC_RMID, NULL);
+    msgctl_IPC_RMID_handler(msg_urzad_SC_id);
+    msgctl_IPC_RMID_handler(msg_urzad_SC_back_id);
 
-    msgctl(msg_urzad_KM_id, IPC_RMID, NULL);
-    msgctl(msg_urzad_KM_back_id, IPC_RMID, NULL);
+    msgctl_IPC_RMID_handler(msg_urzad_KM_id);
+    msgctl_IPC_RMID_handler(msg_urzad_KM_back_id);
 
-    msgctl(msg_urzad_ML_id, IPC_RMID, NULL);
-    msgctl(msg_urzad_ML_back_id, IPC_RMID, NULL);
+    msgctl_IPC_RMID_handler(msg_urzad_ML_id);
+    msgctl_IPC_RMID_handler(msg_urzad_ML_back_id);
     
-    msgctl(msg_urzad_PD_id, IPC_RMID, NULL);
-    msgctl(msg_urzad_PD_back_id, IPC_RMID, NULL);   
+    msgctl_IPC_RMID_handler(msg_urzad_PD_id);
+    msgctl_IPC_RMID_handler(msg_urzad_PD_back_id);   
 
-    msgctl(msg_urzad_KASA_id, IPC_RMID, NULL);
-    msgctl(msg_urzad_KASA_back_id, IPC_RMID, NULL);
-
-    //Usuwanie kolejek komunikatów
-    msgctl(msg_urzad_id, IPC_RMID, NULL);
-    msgctl(msg_urzad_back_id, IPC_RMID, NULL);
+    msgctl_IPC_RMID_handler(msg_urzad_KASA_id);
+    msgctl_IPC_RMID_handler(msg_urzad_KASA_back_id);
 
     // czekamy na wszystkie dzieciaczki
     while (wait(NULL) > 0);
@@ -259,16 +292,7 @@ void cleanup() {
 
 // Obsługa sygnałów
 void signal_handler(int sig) {
-    if (sig == SIGINT) {
-        printf("\n[DYREKTOR] SIGINT -> ewakuacja.\n");
-        sem_p(semid, SEM_MUTEX);
-        if (shm)
-            shm->koniec_pracy = 2;
-        sem_v(semid, SEM_MUTEX);
-        cleanup();
-        exit(1);
-    }
-    else if (sig == SIGCHLD){
+    if (sig == SIGCHLD){
         wait(NULL);
     }
     else if (sig == SIGTERM){
@@ -287,14 +311,18 @@ void signal_handler(int sig) {
 }
 
 void sojowanie_urzednikow(pid_t pidus_amogus_susus_impostorus){
-    kill(pidus_amogus_susus_impostorus, SIGUSR1);
+    if(kill(pidus_amogus_susus_impostorus, SIGUSR1) == -1){
+            perror("kill sojowanie");
+            exit(1);
+    }
 }
 
 void generator(){
     if (!generator_pid) {                                           //Jeśli dzieciak to dajemy mu przywilej bycia generatorem, aż do śmierci 
-        signal(SIGCHLD, signal_handler);
-        signal(SIGTERM, signal_handler);
-        signal(SIGRTMIN, signal_handler);
+        if(signal(SIGCHLD, signal_handler) == SIG_ERR || signal(SIGTERM, signal_handler) == SIG_ERR || signal(SIGRTMIN, signal_handler) == SIG_ERR){
+            perror("signal generator");
+            exit(1);
+        }
         while (1) {                                                     //Generator pracuje do zamknięcia urzędu
             //Generator pracuje do zamknięcia urzędu
             if (generator_stop_flag) break;
@@ -316,22 +344,52 @@ void generator(){
                 else if (r < 70) cel = DEPT_SC;
                 else if (r < 80) cel = DEPT_KM;
                 else if (r < 90) cel = DEPT_ML;
-                else cel = DEPT_PD;                                    //Jeśli jest dzieciakiem to przerabiamy go na petenta
+                else cel = DEPT_PD;
                 char kamilek[16];
 
                 snprintf(kamilek, sizeof(kamilek), "%d", cel);
                 execl("./petent", "petent", kamilek ,NULL);
-                //Jeśli tu jesteśmy, exec jebnął
                 perror("execl petent");
                 exit(1);
             }
         }
         while(wait(NULL)>0);
-
-        while(sem_p(semid, SEM_MUTEX));
-        shm->brak_petentow = 1;
-        while(sem_v(semid, SEM_MUTEX));
         
         exit(0);
     }
+}
+
+void zamykanie(){
+    printf("[DYREKTOR] Tk — zamykamy, nowi nie wchodzą.\n");
+    fflush(stdout);
+
+    while(sem_p(semid, SEM_MUTEX));
+    shm->koniec_pracy = 1;   //Zamknięcie
+    while(sem_v(semid, SEM_MUTEX));
+
+    for(int i=0; i<7; i++){
+        sojowanie_urzednikow(urzednicy[i]);
+    }
+
+    while(sem_op(semid, SEM_LOCK_REGISTER, -7, 0));
+
+    // Zabij generator jeśli jeszcze działa
+    if (generator_pid > 0){
+        if(kill(generator_pid, SIGTERM) == -1){
+            perror("kill generator");
+            exit(1);
+        }
+    }
+
+    while(sem_p(semid, SEM_MUTEX));
+    shm->koniec_pracy = 3;   //Zamknięcie Biletomatów
+    while(sem_v(semid, SEM_MUTEX));
+
+    while (wait(NULL) > 0); 
+
+    //Funkcja do czyszczena
+    cleanup();
+
+    //Czekam na dziecki
+    while (wait(NULL) > 0); 
 }
