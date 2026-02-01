@@ -10,7 +10,6 @@ void czysciciel();
 
 int typ_wydzialu, monitor_offset,shmid, semid, msg_urzad, msg_urzad_back, queue_id, queue_back_id, obsluzeni;
 int close_flag = 0;
-int stop_queue_clear = 0;
 int sa_zamkiete = 0;
 volatile int sigflag = 0;
 
@@ -74,9 +73,6 @@ void signal_handler(int sig){
     }
     else if(sig == SIGUSR1){
         director_shutdown();
-    }
-    else if(sig == SIGUSR2){
-        stop_queue_clear = 1;
     }
 }
 
