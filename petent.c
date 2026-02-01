@@ -15,15 +15,11 @@ SharedData *shm;
 
 Komunikat msg;
 
-//sigset_t old_sigset, new_sigset;
-
 void kys();
 void petent_loop();
 void* opiekun_thread(void *arg);
 void set_queue_id();
 void atexit_action(void);
-//void sem_p_mutex(semid);
-//void sem_v_mutex(semid);
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -401,27 +397,3 @@ void set_queue_id(){
 void atexit_action(void){
     while(sem_v(semid, SEM_PETENCI));
 }
-
-//void block_signal(void) {
-//    sigemptyset(&new_sigset);
-//    sigaddset(&new_sigset, SIGRTMIN);
-//    if (pthread_sigmask(SIG_BLOCK, &new_sigset, &old_sigset) != 0) {
-//        perror("pthread_sigmask block");
-//    }
-//}
-//
-//void restore_signal(void) {
-//    if (pthread_sigmask(SIG_SETMASK, &old_sigset, NULL) != 0) {
-//        perror("pthread_sigmask restore");
-//    }
-//}
-//
-//void sem_p_mutex() {
-//    block_signal();
-//    while(sem_p(semid, SEM_MUTEX));
-//}
-//
-//void sem_v_mutex() {
-//    while(sem_v(semid, SEM_MUTEX));
-//    restore_signal();
-//}
