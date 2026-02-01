@@ -33,22 +33,22 @@ int main(int argc, char **argv) {
     srand(seed);
     init_signals();
 
-    semid = semget(ftok_handler(FTOK_PATH, ID_SEM), 7, 0600);
+    semid = semget(ftok_handler(FTOK_PATH, ID_SEM), 6, 0);
     if(semid == -1){
         perror("semget urzednik");
     }
 
-    msg_urzad = msgget(ftok_handler(FTOK_PATH, queue_id), 0600);
+    msg_urzad = msgget(ftok_handler(FTOK_PATH, queue_id), 0);
     if(msg_urzad == -1){
         perror("msgget urzednik msg_urzad");
     }
-    msg_urzad_back = msgget(ftok_handler(FTOK_PATH, queue_back_id), 0600);
+    msg_urzad_back = msgget(ftok_handler(FTOK_PATH, queue_back_id), 0);
     if(msg_urzad_back == -1){
         perror("msgget urzednik msg_urzad_back");
     }
 
-    shmid = shmget(ftok_handler(FTOK_PATH, ID_SHM), sizeof(SharedData), 0600);
-    mshmid = shmget(ftok_handler(FTOK_PATH, ID_SHM_MONITOR), sizeof(MonitorData), 0600);
+    shmid = shmget(ftok_handler(FTOK_PATH, ID_SHM), sizeof(SharedData), 0);
+    mshmid = shmget(ftok_handler(FTOK_PATH, ID_SHM_MONITOR), sizeof(MonitorData), 0);
     if(shmid == -1 || mshmid == -1){
         perror("shmget urzednik");
     }
@@ -146,8 +146,8 @@ void set_queue_id(){
 
 void start_urzednik() {
     // Inicjalizacja pamięci, semaforów, kolejki komunikatów
-    int msg_bilet = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET), 0600);
-    int msg_bilet_back = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET_BACK), 0600);
+    int msg_bilet = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET), 0);
+    int msg_bilet_back = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET_BACK), 0);
     if(msg_bilet == -1 || msg_bilet_back == -1){
         perror("msget biletomat bilet");
         exit(1);
@@ -313,6 +313,8 @@ void start_urzednik() {
 
     if(typ_wydzialu != DEPT_SA || sa_zamkiete){
         empty_msgqueue();
+        msgctl_IPC_RMID_handler(msg_urzad);
+        msgctl_IPC_RMID_handler(msg_urzad_back);
     }
 
     printf("\033[33m[URZEDNIK %d] Koniec - obsluzeni: %d\033[m\n",typ_wydzialu, obsluzeni);
@@ -348,9 +350,12 @@ void director_shutdown(){
 }
 
 void empty_msgqueue(){
-    while(stop_queue_clear){
-        if (msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), -3, 0) == -1){
-            if(errno == EINTR){
+    while(1){
+        if (msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), -3, IPC_NOWAIT) == -1){
+            if (errno == ENOMSG) {
+                break;
+            } 
+            else if(errno == EINTR){
                 continue;
             }
             else if(errno){
