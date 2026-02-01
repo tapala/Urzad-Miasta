@@ -157,7 +157,7 @@ void start_urzednik() {
     obsluzeni = 0;
     char log_buf[256];
 
-    printf("[URZĘDNIK %d] Rozpoczyna pracę.\n", typ_wydzialu);
+    printf("\033[33m[URZĘDNIK %d] Rozpoczyna pracę.\033[m\n", typ_wydzialu);
 
     while (!close_flag)
     {

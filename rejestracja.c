@@ -68,13 +68,13 @@ void uruchom_biletomat(){
 
     // Rejestracja robi podział komórkowy i rozkazuje bachorowi dymać na kasie
     pid_t pid = fork();
-    printf("OTWIERAM BILETOMAT \n");
-    fflush(stdout);
     if (pid == -1){
         perror("fork biletomat");
         return;
     }
     else if (pid == 0) {
+        printf("\033[34mOTWIERAM BILETOMAT \033[m\n");
+        fflush(stdout);
         if(signal(SIGTERM, signal_handler) == SIG_ERR){
             perror("signal biletomat");
             return;
@@ -99,7 +99,7 @@ void zamkni_biletomat() {
     }
     liczba_biletomatow--;
     waitpid(pid, NULL, 0);
-    printf("BILETOMAT ZAMKNIETY \n");
+    printf("\033[34mBILETOMAT ZAMKNIETY\033[m \n");
     fflush(stdout);
 }
 
@@ -125,7 +125,7 @@ int main() {
         exit(1);
     }
     init_signals();
-    printf("[REJESTRACJA] System biletowy uruchomiony\n");
+    printf("\033[34m[REJESTRACJA] System biletowy uruchomiony\033[m\n");
 
     while (1) {
 

@@ -65,24 +65,23 @@ int main(int argc, char** argv) {
     init_signals();
 
     msg_bilet_id = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET), 0);
-    msg_bilet_back_id = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET_BACK), 0);
-    msg_urzad_id = msgget(ftok_handler(FTOK_PATH, queue_id), 0);
-    msg_urzad_back_id = msgget(ftok_handler(FTOK_PATH, queue_back_id), 0);
-
     if(msg_bilet_id == -1){
-        fprintf(stderr,"%s - msgget bilet; cel = %d - %s => %d \n", strerror(errno), cel,__FILE__,__LINE__);
         exit(1);
     }
+    msg_bilet_back_id = msgget(ftok_handler(FTOK_PATH, ID_MSG_BILET_BACK), 0);
     if(msg_bilet_back_id == -1){
-        fprintf(stderr,"%s - msgget bilet back; cel = %d - %s => %d \n", strerror(errno), cel,__FILE__,__LINE__);
         exit(1);
     }
+    msg_urzad_id = msgget(ftok_handler(FTOK_PATH, queue_id), 0);
     if(msg_urzad_id == -1){
-        fprintf(stderr,"%s - msgget urzad; cel = %d - %s => %d \n", strerror(errno), cel,__FILE__,__LINE__);
+        if(errno != ENOENT)
+            fprintf(stderr,"%s - msgget urzad; cel = %d - %s => %d \n", strerror(errno), cel,__FILE__,__LINE__);
         exit(1);
     }
+    msg_urzad_back_id = msgget(ftok_handler(FTOK_PATH, queue_back_id), 0);
     if(msg_urzad_back_id == -1){
-        fprintf(stderr,"%s - msgget urzad back; cel = %d - %s => %d \n", strerror(errno), cel,__FILE__,__LINE__);
+        if(errno != ENOENT)
+            fprintf(stderr,"%s - msgget urzad back; cel = %d - %s => %d \n", strerror(errno), cel,__FILE__,__LINE__);
         exit(1);
     }
 

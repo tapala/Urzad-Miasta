@@ -370,16 +370,16 @@ void zamykanie(){
     shm->koniec_pracy = 1;   //Zamknięcie
     sem_v_mutex(semid);
 
-    for(int i=0; i<7; i++){
-        sojowanie_urzednikow(urzednicy[i], 1);
-    }
-
     // Zabij generator jeśli jeszcze działa
     if (generator_pid > 0){
         if(kill(generator_pid, SIGTERM) == -1){
             perror("kill generator");
             exit(1);
         }
+    }
+
+    for(int i=0; i<7; i++){
+        sojowanie_urzednikow(urzednicy[i], 1);
     }
 
     while(sem_op(semid, SEM_LOCK_REGISTER, -8, 0));
@@ -413,13 +413,14 @@ void input_validation(){
     if(MAX_PETENTOW_W_BUDYNKU < 2 || MAX_PROCESOW_PETENTOW < 10){
         printf("Zbyt niska MAX_PETENTOW_W_BUDYNKU lub MAX_PROCESOW_PETENTOW\n");
         fflush(stdout);
+        exit(1);
     }
     if((MAX_PETENTOW_W_BUDYNKU/3) > PROG_URUCHOMIENIA_KAS){
         printf("Zbyt niski PROG_URUCHOMIENIA_KAS względem MAX_PETENTOW_W_BUDYNKU\n");
         fflush(stdout);
         exit(1);
     }
-    if(CZAS_PRACY < -1000){
+    if(CZAS_PRACY < 1){
         printf("Zbyt krótki CZAS_PRACY\n");
         fflush(stdout);
         exit(1);
