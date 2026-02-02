@@ -150,7 +150,7 @@ void petent_loop() {
 
     // Ustawiamy/losujemy początkowe dane
     my_pid = getpid();
-    int vip = (rand() % 100 < 2);
+    int vip = (rand() % 100 <= 2);
 
     // Obsługa wieku
     int wiek;
