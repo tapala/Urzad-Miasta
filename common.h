@@ -17,23 +17,23 @@
 #include <string.h> 
 #include <sys/wait.h>
 
-#define MAX_PETENTOW_W_BUDYNKU (1000)
+#define MAX_PETENTOW_W_BUDYNKU (2000)
 #define PROG_URUCHOMIENIA_KAS (750)
-#define CZAS_DO_OTWARCIA (5) //Tp
-#define CZAS_PRACY (10) //Tk-Tp
-#define CZAS_PO_ZAMKNIECIU (0) //Domślnie 2 minuty wedle założeń projektu
-#define MAX_PROCESOW_PETENTOW (10000) //Będzie przydatne do ograniczenia petentów w generatorze
+#define CZAS_DO_OTWARCIA (10) //Tp
+#define CZAS_PRACY (60) //Tk-Tp
+#define CZAS_PO_ZAMKNIECIU (10) //Domślnie 2 minuty wedle założeń projektu
+#define MAX_PROCESOW_PETENTOW (5000) //Będzie przydatne do ograniczenia petentów w generatorze
 
 #define LIMIT_OSIAGNIETY (-1) //Stała do msgqueue dla czytelności 
 #define POWROT_Z_KASY (-2) //Stała do msgqueue
 #define KONIEC_OBSLUGI (-3) //Stała do msgqueue
 
 //Limity wydziałow:
-#define LIMIT_SA (6000)
-#define LIMIT_SC (1000)
-#define LIMIT_KM (1000)
-#define LIMIT_ML (1000)
-#define LIMIT_PD (1000)
+#define LIMIT_SA (12000)
+#define LIMIT_SC (2000)
+#define LIMIT_KM (2000)
+#define LIMIT_ML (2000)
+#define LIMIT_PD (2000)
 #define MAX_BILETOW (LIMIT_SA + LIMIT_SC + LIMIT_KM + LIMIT_ML +LIMIT_PD)
 
 //Identyfikatory wydziałow i kasy - przyda się do obsługi p[etenta]

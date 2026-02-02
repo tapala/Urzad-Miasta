@@ -29,7 +29,7 @@ void biletomat_loop(){
                 continue;
             }
             else{
-                fprintf(stderr,"%s -- %d -- Wyjebka na msgrcv - %s => %d \n", strerror(errno), getpid(),__FILE__,__LINE__);
+                fprintf(stderr,"%s -- %d -- Wywrotka na msgrcv - %s => %d \n", strerror(errno), getpid(),__FILE__,__LINE__);
                 exit(1);
             }
         }
@@ -53,7 +53,7 @@ void biletomat_loop(){
                 goto try_again;
             }
             else{
-                fprintf(stderr,"%s -- %d -- Wyjebka na msgsnd - %s => %d \n", strerror(errno), getpid(),__FILE__,__LINE__);
+                fprintf(stderr,"%s -- %d -- Wywrotka na msgsnd - %s => %d \n", strerror(errno), getpid(),__FILE__,__LINE__);
                 exit(1);
             }
         }

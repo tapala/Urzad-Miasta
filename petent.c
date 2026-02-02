@@ -102,13 +102,13 @@ void* opiekun_thread(void *arg)
     // Wysłanie żądania biletu
     if(msgsnd(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
         if(errno != EINTR)
-            fprintf(stderr,"%s - Wyjebka na msgsnd - Rejestracja - %s => %d \n", strerror(errno), __FILE__,__LINE__);
+            fprintf(stderr,"%s - Wywrotka na msgsnd - Rejestracja - %s => %d \n", strerror(errno), __FILE__,__LINE__);
     }
 
     // Odebranie biletu adresowanego do PID petenta
     if(msgrcv(msg_bilet_back_id, &msg, sizeof(Komunikat) - sizeof(long), msg.pid_petenta, 0) == -1){
         if(errno != EINTR)
-            fprintf(stderr,"%s - Wyjebka na msgrcv - Rejestracja - %s => %d \n", strerror(errno), __FILE__,__LINE__);
+            fprintf(stderr,"%s - Wywrotka na msgrcv - Rejestracja - %s => %d \n", strerror(errno), __FILE__,__LINE__);
     }
 
     if(msg.typ_sprawy == LIMIT_OSIAGNIETY){
@@ -250,7 +250,7 @@ void petent_loop() {
         // Komunikat wysyłamy do do biletomatu...
         if(msgsnd(msg_bilet_id, &msg, sizeof(Komunikat) - sizeof(long), 0) == -1){
             if(errno != EINTR){
-                fprintf(stderr,"%s -- %d -- Wyjebka na msgsend - Rejestracja - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+                fprintf(stderr,"%s -- %d -- Wywrotka na msgsend - Rejestracja - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
                 kys();
             }
         }
@@ -258,7 +258,7 @@ void petent_loop() {
         // ...po czym pobieramy komunikat zwrotny...
         if(msgrcv(msg_bilet_back_id, &msg, sizeof(Komunikat) - sizeof(long), my_pid, 0) == -1){
             if(errno != EINTR){
-                fprintf(stderr,"%s -- %d -- Wyjebka na msgrcv - Rejestracja - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+                fprintf(stderr,"%s -- %d -- Wywrotka na msgrcv - Rejestracja - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
                 kys();
             }
         }
@@ -307,7 +307,7 @@ void petent_loop() {
                 break;
             }
             else if(errno != EINTR){
-                fprintf(stderr,"%s -- %d -- Wyjebka na msgsend - Urzednik - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+                fprintf(stderr,"%s -- %d -- Wywrotka na msgsend - Urzednik - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
                 break;
             }
         }
@@ -315,7 +315,7 @@ void petent_loop() {
         // Jeśli komunikat się nie powiedzie to przerywamy pętlę
         if (msgrcv(msg_urzad_back_id, &msg, sizeof(Komunikat) - sizeof(long), my_pid, 0) == -1){
             if(errno != EINTR){
-                fprintf(stderr,"%s -- %d -- Wyjebka na msgrcv - Urzednik - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
+                fprintf(stderr,"%s -- %d -- Wywrotka na msgrcv - Urzednik - %s => %d \n", strerror(errno), my_pid,__FILE__,__LINE__);
                 break;
             }
         }

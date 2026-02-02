@@ -332,7 +332,7 @@ void generator(){
             if(sem_p(semid, SEM_PETENCI)) continue;                      
             pid_t child = fork();                                       //Forkujemy nasz generator
             if (child == -1){
-                fprintf(stderr,"%s -- %s -- Wyjebka na Generator => %d \n", strerror(errno),__FILE__,__LINE__);
+                fprintf(stderr,"%s -- %s -- Wywrotka na Generator => %d \n", strerror(errno),__FILE__,__LINE__);
                 exit(1);
             }
             if (!child) {   

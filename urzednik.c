@@ -91,7 +91,7 @@ void czysciciel(){
                     continue;
                 }
                 else if(errno){
-                    fprintf(stderr,"%s - Wyjebka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
+                    fprintf(stderr,"%s - Wywrotka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
                     exit(1);
                 }
             }
@@ -105,7 +105,7 @@ void czysciciel(){
                     continue;
                 }
                 else if(errno){
-                    fprintf(stderr,"%s - Wyjebka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
+                    fprintf(stderr,"%s - Wywrotka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
                     exit(1);
                 }
             }
@@ -161,7 +161,7 @@ void start_urzednik() {
         sem_p_mutex(semid);
         int stan = shm->koniec_pracy;
         sem_v_mutex(semid);
-
+        
         if(msgrcv(msg_urzad, &msg, sizeof(Komunikat) - sizeof(long), -3, 0) == -1){
             if(errno == EINTR){
                 if(!sigflag)
@@ -169,7 +169,7 @@ void start_urzednik() {
                 continue;
             }
             else{
-                perror("Wyjebka message queue");
+                perror("Wywrotka message queue");
             }
         }
 
@@ -230,7 +230,7 @@ void start_urzednik() {
                         continue;
                     }
                     else{
-                        fprintf(stderr,"%s - Wyjebka na msgsnd - SA => Rejestracja - %s => %d \n", strerror(errno), __FILE__,__LINE__);
+                        fprintf(stderr,"%s - Wywrotka na msgsnd - SA => Rejestracja - %s => %d \n", strerror(errno), __FILE__,__LINE__);
                     }
                     
                 }
@@ -243,7 +243,7 @@ void start_urzednik() {
                         continue;
                     }
                     else{
-                        fprintf(stderr,"%s - Wyjebka na msgrcv - Rejestracja => SA - %s => %d \n", strerror(errno), __FILE__,__LINE__);
+                        fprintf(stderr,"%s - Wywrotka na msgrcv - Rejestracja => SA - %s => %d \n", strerror(errno), __FILE__,__LINE__);
                     }
                     
                 }
@@ -286,7 +286,7 @@ void start_urzednik() {
                     goto repeat_197;
             }
             else{
-            fprintf(stderr,"%s - Wyjebka na msgsnd do klienta - %d ||| %d \n", strerror(errno), typ_wydzialu,__LINE__);                        
+            fprintf(stderr,"%s - Wywrotka na msgsnd do klienta - %d ||| %d \n", strerror(errno), typ_wydzialu,__LINE__);                        
             }
 
         }
@@ -344,7 +344,7 @@ void empty_msgqueue(){
                 continue;
             }
             else if(errno){
-                fprintf(stderr,"%s - Wyjebka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
+                fprintf(stderr,"%s - Wywrotka na msgrcv przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
                 return;
             }
         }
@@ -358,7 +358,7 @@ void empty_msgqueue(){
                     goto repeat_262;
                 }
                 else{
-                fprintf(stderr,"%s - Wyjebka na msgsnd przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
+                fprintf(stderr,"%s - Wywrotka na msgsnd przy końcu pracy urzednika- %d \n", strerror(errno), __LINE__);
                 return;                    
                 }
 
